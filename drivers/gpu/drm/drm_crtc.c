@@ -5408,3 +5408,248 @@ struct drm_property *drm_mode_create_rotation_property(struct drm_device *dev,
 					   supported_rotations);
 }
 EXPORT_SYMBOL(drm_mode_create_rotation_property);
+
+#include <drm/drm_atomic.h>
+
+int drm_mode_atomic_ioctl(struct drm_device *dev,
+			  void *data, struct drm_file *file_priv)
+{
+	struct drm_mode_atomic *arg = data;
+	uint32_t __user *objs_ptr = (uint32_t __user *)(unsigned long)(arg->objs_ptr);
+	uint32_t __user *count_props_ptr = (uint32_t __user *)(unsigned long)(arg->count_props_ptr);
+	uint32_t __user *props_ptr = (uint32_t __user *)(unsigned long)(arg->props_ptr);
+	uint64_t __user *prop_values_ptr = (uint64_t __user *)(unsigned long)(arg->prop_values_ptr);
+	unsigned int copied_objs, copied_props;
+	struct drm_atomic_state *state;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_plane *plane;
+	unsigned plane_mask = 0;
+	int ret = 0;
+	unsigned int i, j;
+
+	if (arg->flags & ~DRM_MODE_ATOMIC_FLAGS)
+		return -EINVAL;
+
+	/* can't test and expect an event at the same time. */
+	if ((arg->flags & DRM_MODE_ATOMIC_TEST_ONLY) &&
+			(arg->flags & DRM_MODE_PAGE_FLIP_EVENT))
+		return -EINVAL;
+
+	drm_modeset_acquire_init(&ctx, 0);
+
+	state = drm_atomic_state_alloc(dev);
+	if (!state)
+		return -ENOMEM;
+
+	state->acquire_ctx = &ctx;
+
+retry:
+	copied_objs = 0;
+	copied_props = 0;
+
+	for (i = 0; i < arg->count_objs; i++) {
+		uint32_t obj_id, count_props;
+		struct drm_mode_object *obj;
+
+		if (get_user(obj_id, objs_ptr + copied_objs)) {
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		obj = drm_mode_object_find(dev, obj_id, DRM_MODE_OBJECT_ANY);
+		if (!obj || !obj->properties) {
+			ret = -ENOENT;
+			goto fail;
+		}
+
+		if (obj->type == DRM_MODE_OBJECT_PLANE) {
+			plane = obj_to_plane(obj);
+			plane_mask |= (1 << drm_plane_index(plane));
+			plane->old_fb = plane->fb;
+		}
+
+		if (get_user(count_props, count_props_ptr + copied_objs)) {
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		copied_objs++;
+
+		for (j = 0; j < count_props; j++) {
+			uint32_t prop_id;
+			uint64_t prop_value;
+			struct drm_property *prop;
+			void *ref;
+
+			if (get_user(prop_id, props_ptr + copied_props)) {
+				ret = -EFAULT;
+				goto fail;
+			}
+
+			prop = drm_property_find(dev, prop_id);
+			if (!prop) {
+				ret = -ENOENT;
+				goto fail;
+			}
+
+			if (get_user(prop_value, prop_values_ptr + copied_props)) {
+				ret = -EFAULT;
+				goto fail;
+			}
+
+			if (!drm_property_change_valid_get(prop, prop_value, &ref)) {
+				ret = -EINVAL;
+				goto fail;
+			}
+
+			switch (obj->type) {
+			case DRM_MODE_OBJECT_CONNECTOR: {
+				struct drm_connector *connector = obj_to_connector(obj);
+				struct drm_connector_state *connector_state;
+
+				connector_state = drm_atomic_get_connector_state(state, connector);
+				if (IS_ERR(connector_state)) {
+					ret = PTR_ERR(connector_state);
+					break;
+				}
+
+				ret = connector->funcs->atomic_set_property(connector,
+						connector_state, prop, prop_value);
+				break;
+			}
+			case DRM_MODE_OBJECT_CRTC: {
+				struct drm_crtc *crtc = obj_to_crtc(obj);
+				struct drm_crtc_state *crtc_state;
+
+				crtc_state = drm_atomic_get_crtc_state(state, crtc);
+				if (IS_ERR(crtc_state)) {
+					ret = PTR_ERR(crtc_state);
+					break;
+				}
+
+				ret = crtc->funcs->atomic_set_property(crtc,
+						crtc_state, prop, prop_value);
+				break;
+			}
+			case DRM_MODE_OBJECT_PLANE: {
+				struct drm_plane *plane = obj_to_plane(obj);
+				struct drm_plane_state *plane_state;
+
+				plane_state = drm_atomic_get_plane_state(state, plane);
+				if (IS_ERR(plane_state)) {
+					ret = PTR_ERR(plane_state);
+					break;
+				}
+
+				ret = plane->funcs->atomic_set_property(plane,
+						plane_state, prop, prop_value);
+				break;
+			}
+			default:
+				ret = -EINVAL;
+				break;
+			}
+
+			copied_props++;
+
+			drm_property_change_valid_put(prop, ref);
+
+			if (ret)
+				goto fail;
+		}
+	}
+
+	if (arg->flags & DRM_MODE_PAGE_FLIP_EVENT) {
+		int ncrtcs = dev->mode_config.num_crtc;
+
+		for (i = 0; i < ncrtcs; i++) {
+			struct drm_crtc_state *crtc_state = state->crtc_states[i];
+			struct drm_pending_vblank_event *e;
+
+			if (!crtc_state)
+				continue;
+
+			e = create_vblank_event(dev, file_priv, arg->user_data);
+			if (!e) {
+				ret = -ENOMEM;
+				goto fail;
+			}
+
+			crtc_state->event = e;
+		}
+	}
+
+	/* sanity check incoming state, because danvet wanted this
+	 * to be an even bigger monster ioctl and wanted to be able
+	 * to WARN_ON() in these cases in the helpers:
+	 */
+	drm_for_each_plane_mask(plane, dev, plane_mask) {
+		struct drm_plane_state *plane_state =
+			drm_atomic_get_plane_state(state, plane);
+
+		if (IS_ERR(plane_state)) {
+			ret = PTR_ERR(plane_state);
+			goto fail;
+		}
+
+		if (WARN_ON(plane_state->crtc && !plane_state->fb)) {
+			DRM_DEBUG_KMS("CRTC set but no FB\n");
+			ret = -EINVAL;
+			goto fail;
+		} else if (WARN_ON(plane_state->fb && !plane_state->crtc)) {
+			DRM_DEBUG_KMS("FB set but no CRTC\n");
+			ret = -EINVAL;
+			goto fail;
+		}
+	}
+
+	if (arg->flags & DRM_MODE_ATOMIC_TEST_ONLY) {
+		ret = drm_atomic_check_only(state);
+		/* _check_only() does not free state, unlike _commit() */
+		drm_atomic_state_free(state);
+	} else if (arg->flags & DRM_MODE_ATOMIC_NONBLOCK) {
+		ret = drm_atomic_async_commit(state);
+	} else {
+		ret = drm_atomic_commit(state);
+	}
+
+	/* if succeeded, fixup legacy plane crtc/fb ptrs before dropping
+	 * locks (ie. while it is still safe to deref plane->state).  We
+	 * need to do this here because the driver entry points cannot
+	 * distinguish between legacy and atomic ioctls.
+	 */
+	drm_for_each_plane_mask(plane, dev, plane_mask) {
+		if (ret == 0) {
+			struct drm_framebuffer *new_fb = plane->state->fb;
+			if (new_fb)
+				drm_framebuffer_reference(new_fb);
+			plane->fb = new_fb;
+			plane->crtc = plane->state->crtc;
+		} else {
+			plane->old_fb = NULL;
+		}
+		if (plane->old_fb) {
+			drm_framebuffer_unreference(plane->old_fb);
+			plane->old_fb = NULL;
+		}
+	}
+
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
+
+fail:
+	if (ret == -EDEADLK)
+		goto backoff;
+
+	// TODO cleanup crtc_state->event's in fail path..
+
+	return ret;
+
+backoff:
+	drm_atomic_state_clear(state);
+	drm_modeset_backoff(&ctx);
+
+	goto retry;
+}
