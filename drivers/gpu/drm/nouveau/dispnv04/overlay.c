@@ -208,9 +208,9 @@ nv10_set_params(struct nouveau_plane *plane)
 }
 
 static int
-nv10_set_property(struct drm_plane *plane,
+nv10_set_property(struct drm_plane *plane, void *state,
 		  struct drm_property *property,
-		  uint64_t value)
+		  uint64_t value, void *blob_data)
 {
 	struct nouveau_plane *nv_plane = (struct nouveau_plane *)plane;
 
