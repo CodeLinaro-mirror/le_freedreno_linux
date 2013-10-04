@@ -73,11 +73,12 @@ static int tegra_plane_update(struct drm_plane *plane, struct drm_crtc *crtc,
 
 static int tegra_plane_disable(struct drm_plane *plane)
 {
-	struct tegra_dc *dc = to_tegra_dc(plane->crtc);
+	struct drm_plane_state *state = plane->state;
+	struct tegra_dc *dc = to_tegra_dc(state->crtc);
 	struct tegra_plane *p = to_tegra_plane(plane);
 	unsigned long value;
 
-	if (!plane->crtc)
+	if (!state->crtc)
 		return 0;
 
 	value = WINDOW_A_SELECT << p->index;
@@ -309,13 +310,14 @@ static void tegra_crtc_disable(struct drm_crtc *crtc)
 	struct drm_plane *plane;
 
 	list_for_each_entry(plane, &drm->mode_config.plane_list, head) {
-		if (plane->crtc == crtc) {
+		struct drm_plane_state *state = plane->state;
+		if (state->crtc == crtc) {
 			tegra_plane_disable(plane);
-			plane->crtc = NULL;
+			state->crtc = NULL;
 
-			if (plane->fb) {
-				drm_framebuffer_unreference(plane->fb);
-				plane->fb = NULL;
+			if (state->fb) {
+				drm_framebuffer_unreference(state->fb);
+				state->fb = NULL;
 			}
 		}
 	}
