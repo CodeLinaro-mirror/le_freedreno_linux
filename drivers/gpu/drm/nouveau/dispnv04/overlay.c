@@ -208,9 +208,9 @@ nv10_set_params(struct nouveau_plane *plane)
 }
 
 static int
-nv10_set_property(struct drm_plane *plane,
+nv10_set_property(struct drm_plane *plane, void *state,
 		  struct drm_property *property,
-		  uint64_t value)
+		  uint64_t value, void *blob_data)
 {
 	struct nouveau_plane *nv_plane = (struct nouveau_plane *)plane;
 
@@ -227,7 +227,9 @@ nv10_set_property(struct drm_plane *plane,
 	else if (property == nv_plane->props.iturbt_709)
 		nv_plane->iturbt_709 = value;
 	else
-		return -EINVAL;
+		return drm_plane_set_property(plane,
+				drm_atomic_get_plane_state(plane, state),
+				property, value, blob_data);
 
 	nv10_set_params(nv_plane);
 	return 0;
