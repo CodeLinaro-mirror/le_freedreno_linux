@@ -9,6 +9,7 @@
 #include <linux/clk.h>
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_atomic_helper.h>
 #include "armada_crtc.h"
 #include "armada_drm.h"
 #include "armada_fb.h"
@@ -308,11 +309,12 @@ static void armada_drm_crtc_prepare(struct drm_crtc *crtc)
 	 */
 	plane = dcrtc->plane;
 	if (plane) {
-		struct drm_framebuffer *fb = plane->fb;
+		struct drm_plane_state *pstate = plane->state;
+		struct drm_framebuffer *fb = pstate->fb;
 
 		plane->funcs->disable_plane(plane);
-		plane->fb = NULL;
-		plane->crtc = NULL;
+		pstate->fb = NULL;
+		pstate->crtc = NULL;
 		drm_framebuffer_unreference(fb);
 	}
 }
@@ -963,7 +965,12 @@ armada_drm_crtc_set_property(struct drm_crtc *crtc, void *state,
 {
 	struct armada_private *priv = crtc->dev->dev_private;
 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
+	struct drm_crtc_state *cstate = drm_atomic_get_crtc_state(crtc, state);
 	bool update_csc = false;
+	int ret = 0;
+
+	if (IS_ERR(cstate))
+		return PTR_ERR(cstate);
 
 	if (property == priv->csc_yuv_prop) {
 		dcrtc->csc_yuv_mode = val;
@@ -971,6 +978,9 @@ armada_drm_crtc_set_property(struct drm_crtc *crtc, void *state,
 	} else if (property == priv->csc_rgb_prop) {
 		dcrtc->csc_rgb_mode = val;
 		update_csc = true;
+	} else {
+		ret = drm_crtc_set_property(crtc, cstate, property,
+				val, blob_data);
 	}
 
 	if (update_csc) {
@@ -981,7 +991,7 @@ armada_drm_crtc_set_property(struct drm_crtc *crtc, void *state,
 		writel_relaxed(val, dcrtc->base + LCD_SPU_IOPAD_CONTROL);
 	}
 
-	return 0;
+	return ret;
 }
 
 static struct drm_crtc_funcs armada_crtc_funcs = {
