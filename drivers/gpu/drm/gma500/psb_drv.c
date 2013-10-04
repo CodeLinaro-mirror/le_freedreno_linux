@@ -489,6 +489,13 @@ static struct drm_driver driver = {
 	.disable_vblank = psb_disable_vblank,
 	.get_vblank_counter = psb_get_vblank_counter,
 
+	.atomic_begin     = drm_atomic_begin,
+	.atomic_set_event = drm_atomic_set_event,
+	.atomic_check     = drm_atomic_check,
+	.atomic_commit    = drm_atomic_commit,
+	.atomic_end       = drm_atomic_end,
+	.atomic_funcs     = &drm_atomic_funcs,
+
 	.gem_free_object = psb_gem_free_object,
 	.gem_vm_ops = &psb_gem_vm_ops,
 
