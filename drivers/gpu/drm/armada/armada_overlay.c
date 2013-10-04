@@ -7,6 +7,7 @@
  * published by the Free Software Foundation.
  */
 #include <drm/drmP.h>
+#include <drm/drm_atomic_helper.h>
 #include "armada_crtc.h"
 #include "armada_drm.h"
 #include "armada_fb.h"
@@ -103,6 +104,7 @@ armada_plane_update(struct drm_plane *plane, struct drm_crtc *crtc,
 	int crtc_x, int crtc_y, unsigned crtc_w, unsigned crtc_h,
 	uint32_t src_x, uint32_t src_y, uint32_t src_w, uint32_t src_h)
 {
+	struct drm_plane_state *state = plane->state;
 	struct armada_plane *dplane = drm_to_armada_plane(plane);
 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
 	uint32_t val, ctrl0;
@@ -133,7 +135,7 @@ armada_plane_update(struct drm_plane *plane, struct drm_crtc *crtc,
 
 	/* FIXME: overlay on an interlaced display */
 	/* Just updating the position/size? */
-	if (plane->fb == fb && dplane->ctrl0 == ctrl0) {
+	if (state->fb == fb && dplane->ctrl0 == ctrl0) {
 		val = (src_h & 0xffff0000) | src_w >> 16;
 		dplane->src_hw = val;
 		writel_relaxed(val, dcrtc->base + LCD_SPU_DMA_HPXL_VLN);
@@ -156,7 +158,7 @@ armada_plane_update(struct drm_plane *plane, struct drm_crtc *crtc,
 	if (ret < 0)
 		return ret;
 
-	if (plane->fb != fb) {
+	if (state->fb != fb) {
 		struct armada_gem_object *obj = drm_fb_obj(fb);
 		uint32_t sy, su, sv;
 
@@ -166,12 +168,12 @@ armada_plane_update(struct drm_plane *plane, struct drm_crtc *crtc,
 		 */
 		drm_framebuffer_reference(fb);
 
-		if (plane->fb) {
+		if (state->fb) {
 			struct drm_framebuffer *older_fb;
 
 			spin_lock_irq(&dplane->lock);
 			older_fb = dplane->old_fb;
-			dplane->old_fb = plane->fb;
+			dplane->old_fb = state->fb;
 			spin_unlock_irq(&dplane->lock);
 			if (older_fb)
 				armada_drm_queue_unref_work(dcrtc->crtc.dev,
@@ -245,13 +247,15 @@ armada_plane_update(struct drm_plane *plane, struct drm_crtc *crtc,
 static int armada_plane_disable(struct drm_plane *plane)
 {
 	struct armada_plane *dplane = drm_to_armada_plane(plane);
+	struct drm_plane_state *state = plane->state;
+
 	struct drm_framebuffer *fb;
 	struct armada_crtc *dcrtc;
 
-	if (!dplane->base.crtc)
+	if (!state->crtc)
 		return 0;
 
-	dcrtc = drm_to_armada_crtc(dplane->base.crtc);
+	dcrtc = drm_to_armada_crtc(state->crtc);
 	dcrtc->plane = NULL;
 
 	spin_lock_irq(&dcrtc->irq_lock);
@@ -264,8 +268,8 @@ static int armada_plane_disable(struct drm_plane *plane)
 	armada_updatel(CFG_PDWN16x66 | CFG_PDWN32x66, 0,
 		       dcrtc->base + LCD_SPU_SRAM_PARA1);
 
-	if (plane->fb)
-		drm_framebuffer_unreference(plane->fb);
+	if (state->fb)
+		drm_framebuffer_unreference(state->fb);
 
 	spin_lock_irq(&dplane->lock);
 	fb = dplane->old_fb;
@@ -287,7 +291,12 @@ static int armada_plane_set_property(struct drm_plane *plane, void *state,
 {
 	struct armada_private *priv = plane->dev->dev_private;
 	struct armada_plane *dplane = drm_to_armada_plane(plane);
+	struct drm_plane_state *pstate = drm_atomic_get_plane_state(plane, state);
 	bool update_attr = false;
+	int ret = 0;
+
+	if (IS_ERR(pstate))
+		return PTR_ERR(pstate);
 
 	if (property == priv->colorkey_prop) {
 #define CCC(v) ((v) << 24 | (v) << 16 | (v) << 8)
@@ -341,13 +350,16 @@ static int armada_plane_set_property(struct drm_plane *plane, void *state,
 	} else if (property == priv->saturation_prop) {
 		dplane->prop.saturation = val;
 		update_attr = true;
+	} else {
+		ret = drm_plane_set_property(plane, pstate, property,
+				val, blob_data);
 	}
 
-	if (update_attr && dplane->base.crtc)
+	if (update_attr && pstate->crtc)
 		armada_ovl_update_attr(&dplane->prop,
-				       drm_to_armada_crtc(dplane->base.crtc));
+				       drm_to_armada_crtc(pstate->crtc));
 
-	return 0;
+	return ret;
 }
 
 static const struct drm_plane_funcs armada_plane_funcs = {
