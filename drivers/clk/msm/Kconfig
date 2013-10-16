@@ -1,0 +1,5 @@
+config COMMON_CLK_MSM
+	tristate "Support for Qualcomm's MSM designs"
+	depends on OF
+	select REGMAP_MMIO
+

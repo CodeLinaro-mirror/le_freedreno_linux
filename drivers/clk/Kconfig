@@ -93,6 +93,8 @@ config CLK_PPC_CORENET
 	  This adds the clock driver support for Freescale PowerPC corenet
 	  platforms using common clock framework.
 
+source "drivers/clk/msm/Kconfig"
+
 endmenu
 
 source "drivers/clk/mvebu/Kconfig"
