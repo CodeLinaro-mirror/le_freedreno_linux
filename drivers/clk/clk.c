@@ -20,6 +20,7 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/regmap.h>
 
 static DEFINE_SPINLOCK(enable_lock);
 static DEFINE_MUTEX(prepare_lock);
@@ -1833,6 +1834,13 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
 	clk->flags = hw->init->flags;
 	clk->num_parents = hw->init->num_parents;
 	hw->clk = clk;
+
+	if (hw->init->regmap)
+		hw->regmap = hw->init->regmap;
+	else if (dev && dev_get_regmap(dev, NULL))
+		hw->regmap = dev_get_regmap(dev, NULL);
+	else if (dev->parent)
+		hw->regmap = dev_get_regmap(dev->parent, NULL);
 
 	/* allocate local copy in case parent_names is __initdata */
 	clk->parent_names = kcalloc(clk->num_parents, sizeof(char *),

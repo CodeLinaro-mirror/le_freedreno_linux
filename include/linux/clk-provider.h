@@ -142,6 +142,8 @@ struct clk_ops {
 	void		(*init)(struct clk_hw *hw);
 };
 
+struct regmap;
+
 /**
  * struct clk_init_data - holds init data that's common to all clocks and is
  * shared between the clock provider and the common clock framework.
@@ -151,6 +153,7 @@ struct clk_ops {
  * @parent_names: array of string names for all possible parents
  * @num_parents: number of possible parents
  * @flags: framework-level hints and quirks
+ * @regmap: regmap to use for regmap helpers and/or by providers
  */
 struct clk_init_data {
 	const char		*name;
@@ -158,6 +161,7 @@ struct clk_init_data {
 	const char		**parent_names;
 	u8			num_parents;
 	unsigned long		flags;
+	struct regmap		*regmap;
 };
 
 /**
@@ -171,10 +175,13 @@ struct clk_init_data {
  *
  * @init: pointer to struct clk_init_data that contains the init data shared
  * with the common clock framework.
+ *
+ * @regmap: regmap to use for regmap helpers and/or by providers
  */
 struct clk_hw {
 	struct clk *clk;
 	const struct clk_init_data *init;
+	struct regmap *regmap;
 };
 
 /*
