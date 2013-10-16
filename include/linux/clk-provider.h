@@ -177,11 +177,21 @@ struct clk_init_data {
  * with the common clock framework.
  *
  * @regmap: regmap to use for regmap helpers and/or by providers
+ *
+ * @enable_reg: register when using regmap enable/disable ops
+ *
+ * @enable_mask: mask when using regmap enable/disable ops
+ *
+ * @enable_is_inverted: flag to indicate set enable_mask bits to disable
+ *                      when using clock_enable_regmap and friends APIs.
  */
 struct clk_hw {
 	struct clk *clk;
 	const struct clk_init_data *init;
 	struct regmap *regmap;
+	unsigned int enable_reg;
+	unsigned int enable_mask;
+	bool enable_is_inverted;
 };
 
 /*
@@ -447,6 +457,9 @@ struct clk *__clk_lookup(const char *name);
 long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
 			      unsigned long *best_parent_rate,
 			      struct clk **best_parent_p);
+int clk_is_enabled_regmap(struct clk_hw *hw);
+int clk_enable_regmap(struct clk_hw *hw);
+void clk_disable_regmap(struct clk_hw *hw);
 
 /*
  * FIXME clock api without lock protection

@@ -742,6 +742,76 @@ out:
 	return best;
 }
 
+/**
+ * clk_is_enabled_regmap - standard is_enabled() for regmap users
+ *
+ * @hw: clk to operate on
+ *
+ * Clocks that use regmap for their register I/O can set the
+ * enable_reg and enable_mask fields in their struct clk_hw and then use
+ * this as their is_enabled operation, saving some code.
+ */
+int clk_is_enabled_regmap(struct clk_hw *hw)
+{
+	unsigned int val;
+	int ret;
+
+	ret = regmap_read(hw->regmap, hw->enable_reg, &val);
+	if (ret != 0)
+		return ret;
+
+	if (hw->enable_is_inverted)
+		return (val & hw->enable_mask) == 0;
+	else
+		return (val & hw->enable_mask) != 0;
+}
+EXPORT_SYMBOL_GPL(clk_is_enabled_regmap);
+
+/**
+ * clk_enable_regmap - standard enable() for regmap users
+ *
+ * @hw: clk to operate on
+ *
+ * Clocks that use regmap for their register I/O can set the
+ * enable_reg and enable_mask fields in their struct clk_hw and then use
+ * this as their enable() operation, saving some code.
+ */
+int clk_enable_regmap(struct clk_hw *hw)
+{
+	unsigned int val;
+
+	if (hw->enable_is_inverted)
+		val = 0;
+	else
+		val = hw->enable_mask;
+
+	return regmap_update_bits(hw->regmap, hw->enable_reg,
+				  hw->enable_mask, val);
+}
+EXPORT_SYMBOL_GPL(clk_enable_regmap);
+
+/**
+ * clk_disable_regmap - standard disable() for regmap users
+ *
+ * @hw: clk to operate on
+ *
+ * Clocks that use regmap for their register I/O can set the
+ * enable_reg and enable_mask fields in their struct clk_hw and then use
+ * this as their disable() operation, saving some code.
+ */
+void clk_disable_regmap(struct clk_hw *hw)
+{
+	unsigned int val;
+
+	if (hw->enable_is_inverted)
+		val = hw->enable_mask;
+	else
+		val = 0;
+
+	regmap_update_bits(hw->regmap, hw->enable_reg, hw->enable_mask, val);
+}
+EXPORT_SYMBOL_GPL(clk_disable_regmap);
+
 /***        clk api        ***/
 
 void __clk_unprepare(struct clk *clk)
