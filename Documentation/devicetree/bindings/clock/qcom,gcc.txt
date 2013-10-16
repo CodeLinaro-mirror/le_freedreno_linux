@@ -1,0 +1,21 @@
+MSM Global Clock & Reset Controller Binding
+-------------------------------------------
+
+Required properties :
+- compatible : shall contain at least "qcom,gcc" and only one of the
+	       following:
+
+			"qcom,gcc-8660"
+			"qcom,gcc-8960"
+
+- reg : shall contain base register location and length
+- #clock-cells : shall contain 1
+- #reset-cells : shall contain 1
+
+Example:
+	clock-controller@900000 {
+		compatible = "qcom,gcc-8960", "qcom,gcc";
+		reg = <0x900000 0x4000>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+	};
