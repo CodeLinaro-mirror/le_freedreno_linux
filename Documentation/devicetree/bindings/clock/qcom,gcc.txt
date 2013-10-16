@@ -7,6 +7,7 @@ Required properties :
 
 			"qcom,gcc-8660"
 			"qcom,gcc-8960"
+			"qcom,gcc-8974"
 
 - reg : shall contain base register location and length
 - #clock-cells : shall contain 1

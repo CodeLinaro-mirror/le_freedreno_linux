@@ -7,4 +7,5 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
 clk-msm-$(CONFIG_COMMON_CLK_MSM) += reset.o
 
 obj-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
+obj-$(CONFIG_MSM_GCC_8974) += gcc-8974.o
 obj-$(CONFIG_MSM_MMCC_8960) += mmcc-8960.o
