@@ -17,6 +17,7 @@ config ARCH_MSM7X00A
 	select MSM_PROC_COMM
 	select MSM_SMD
 	select MSM_SMD_PKG3
+	select MSM_REMOTE_SPINLOCK_SWP
 
 config ARCH_MSM7X30
 	bool "MSM7x30"
@@ -28,6 +29,7 @@ config ARCH_MSM7X30
 	select MSM_PROC_COMM
 	select MSM_SMD
 	select MSM_VIC
+	select MSM_REMOTE_SPINLOCK_DEKKERS
 
 config ARCH_QSD8X50
 	bool "QSD8X50"
@@ -39,6 +41,7 @@ config ARCH_QSD8X50
 	select MSM_PROC_COMM
 	select MSM_SMD
 	select MSM_VIC
+	select MSM_REMOTE_SPINLOCK_LDREX
 
 endchoice
 
@@ -74,6 +77,7 @@ config ARCH_MSM_DT
 	bool
 	select SPARSE_IRQ
 	select USE_OF
+	select MSM_REMOTE_SPINLOCK_AUTO
 
 config MSM_HAS_DEBUG_UART_HS
 	bool
@@ -134,7 +138,34 @@ config MSM_SMD_PKG3
 config MSM_PROC_COMM
 	bool
 
+choice
+	prompt "Remote Spinlock Implementation"
+	default MSM_REMOTE_SPINLOCK_AUTO
+
+config MSM_REMOTE_SPINLOCK_DEKKERS
+	prompt "Dekker's algorithm"
+	bool
+config MSM_REMOTE_SPINLOCK_SWP
+	prompt "SWP-based locks"
+	depends on !THUMB2_KERNEL
+	bool
+config MSM_REMOTE_SPINLOCK_LDREX
+	prompt "LDREX/STREX"
+	bool
+config MSM_REMOTE_SPINLOCK_SFPB
+	prompt "SFPB Hardware Mutex Registers"
+	bool
+config MSM_REMOTE_SPINLOCK_AUTO
+	prompt "Use DT info to configure; fallback to LDREX"
+	bool
+
+endchoice
+
+config MSM_SMEM
+	bool
+
 config MSM_SMD
+	select MSM_SMEM
 	bool
 
 config MSM_GPIOMUX
