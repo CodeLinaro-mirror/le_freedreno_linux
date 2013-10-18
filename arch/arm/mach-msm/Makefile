@@ -13,7 +13,7 @@ obj-$(CONFIG_ARCH_MSM7X30) += dma.o io.o
 obj-$(CONFIG_ARCH_QSD8X50) += dma.o io.o
 
 obj-$(CONFIG_MSM_SMEM) += smem.o remote_spinlock.o
-obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
+obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o smd_private.o
 obj-$(CONFIG_MSM_SMD) += last_radio_log.o
 obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
 
