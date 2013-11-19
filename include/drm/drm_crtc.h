@@ -27,6 +27,7 @@
 
 #include <linux/i2c.h>
 #include <linux/spinlock.h>
+#include <linux/ww_mutex.h>
 #include <linux/types.h>
 #include <linux/idr.h>
 #include <linux/fb.h>
@@ -417,7 +418,7 @@ struct drm_crtc {
 	 * state, ...) and a write lock for everything which can be update
 	 * without a full modeset (fb, cursor data, ...)
 	 */
-	struct mutex mutex;
+	struct ww_mutex mutex;
 
 	struct drm_mode_object base;
 
