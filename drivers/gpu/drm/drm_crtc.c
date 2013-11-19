@@ -37,6 +37,81 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_atomic_helper.h>
+
+
+static int lock_crtc_atomic(struct drm_crtc *crtc,
+		struct drm_atomic_helper_state *a)
+{
+	int ret;
+
+	if (a->flags & DRM_MODE_ATOMIC_NOLOCK)
+		return 0;
+
+	ret = ww_mutex_lock(&crtc->mutex, &a->ww_ctx);
+	if (!ret) {
+		if (crtc->in_atomic) {
+			/* some other pending update with dropped locks */
+			ww_mutex_unlock(&crtc->mutex);
+			return -EBUSY;
+		}
+		crtc->in_atomic = true;
+		WARN_ON(!list_empty(&crtc->lock_head));
+		list_add(&crtc->lock_head, &a->locked_crtcs);
+	} else if (ret == -EALREADY) {
+		/* we already hold the lock.. this is fine */
+		ret = 0;
+	}
+
+	return ret;
+}
+
+/**
+ * drm_modeset_lock_crtc - take crtc modeset lock
+ * @crtc: crtc to lock, NULL for all (only valid if state != NULL)
+ * @state: atomic state
+ *
+ * If state is not NULL, then then it's aquire context is used
+ * and the crtc does not need to be explicitly unlocked, it
+ * will be automatically unlocked when the atomic update is
+ * complete (ioctl returns)
+ */
+int drm_modeset_lock_crtc(struct drm_crtc *crtc, void *state)
+{
+	if (state) {
+		// ugg, this makes atomic_helper mandatory..  not really
+		// sure yet whether I should care, or just simplify things
+		// and require that drivers use or extend atomic_helper:
+		struct drm_atomic_helper_state *a = state;
+		struct drm_mode_config *config = &a->dev->mode_config;
+
+		if (crtc)
+			return lock_crtc_atomic(crtc, a);
+
+		/* give-up mode, ie. I don't know what to lock, so lock all! */
+		list_for_each_entry(crtc, &config->crtc_list, head) {
+			int ret = lock_crtc_atomic(crtc, a);
+			if (ret)
+				return ret;
+		}
+	} else {
+		ww_mutex_lock(&crtc->mutex, NULL);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(drm_modeset_lock_crtc);
+
+/**
+ * drm_modeset_unlock_crtc - drop crtc modeset lock
+ * @crtc: crtc to unlock
+ */
+void drm_modeset_unlock_crtc(struct drm_crtc *crtc)
+{
+	list_del_init(&crtc->lock_head);
+	crtc->in_atomic = false;
+	ww_mutex_unlock(&crtc->mutex);
+}
+EXPORT_SYMBOL(drm_modeset_unlock_crtc);
 
 /**
  * drm_modeset_lock_all - take all modeset locks
@@ -52,7 +127,7 @@ void drm_modeset_lock_all(struct drm_device *dev)
 	mutex_lock(&dev->mode_config.mutex);
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
-		mutex_lock_nest_lock(&crtc->mutex, &dev->mode_config.mutex);
+		ww_mutex_lock(&crtc->mutex, NULL);
 }
 EXPORT_SYMBOL(drm_modeset_lock_all);
 
@@ -65,7 +140,7 @@ void drm_modeset_unlock_all(struct drm_device *dev)
 	struct drm_crtc *crtc;
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
-		mutex_unlock(&crtc->mutex);
+		ww_mutex_unlock(&crtc->mutex);
 
 	mutex_unlock(&dev->mode_config.mutex);
 }
@@ -84,7 +159,7 @@ void drm_warn_on_modeset_not_all_locked(struct drm_device *dev)
 		return;
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
-		WARN_ON(!mutex_is_locked(&crtc->mutex));
+		WARN_ON(!ww_mutex_is_locked(&crtc->mutex));
 
 	WARN_ON(!mutex_is_locked(&dev->mode_config.mutex));
 }
@@ -613,6 +688,8 @@ void drm_framebuffer_remove(struct drm_framebuffer *fb)
 }
 EXPORT_SYMBOL(drm_framebuffer_remove);
 
+DEFINE_WW_CLASS(crtc_ww_class);
+
 /**
  * drm_crtc_init - Initialise a new CRTC object
  * @dev: DRM device
@@ -634,8 +711,10 @@ int drm_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	crtc->invert_dimensions = false;
 
 	drm_modeset_lock_all(dev);
-	mutex_init(&crtc->mutex);
-	mutex_lock_nest_lock(&crtc->mutex, &dev->mode_config.mutex);
+	ww_mutex_init(&crtc->mutex, &crtc_ww_class);
+	drm_modeset_lock_crtc(crtc, NULL);    /* dropped by _unlock_all() */
+
+	INIT_LIST_HEAD(&crtc->lock_head);
 
 	ret = drm_mode_object_get(dev, &crtc->base, DRM_MODE_OBJECT_CRTC);
 	if (ret)
@@ -667,6 +746,8 @@ void drm_crtc_cleanup(struct drm_crtc *crtc)
 
 	kfree(crtc->gamma_store);
 	crtc->gamma_store = NULL;
+
+	WARN_ON(!list_empty(&crtc->lock_head));
 
 	drm_mode_object_put(dev, &crtc->base);
 	list_del(&crtc->head);
@@ -2284,7 +2365,7 @@ static int drm_mode_cursor_common(struct drm_device *dev,
 	}
 	crtc = obj_to_crtc(obj);
 
-	mutex_lock(&crtc->mutex);
+	drm_modeset_lock_crtc(crtc, NULL);
 	if (req->flags & DRM_MODE_CURSOR_BO) {
 		if (!crtc->funcs->cursor_set && !crtc->funcs->cursor_set2) {
 			ret = -ENXIO;
@@ -2308,7 +2389,7 @@ static int drm_mode_cursor_common(struct drm_device *dev,
 		}
 	}
 out:
-	mutex_unlock(&crtc->mutex);
+	drm_modeset_unlock_crtc(crtc);
 
 	return ret;
 
@@ -3657,7 +3738,7 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 		return -ENOENT;
 	crtc = obj_to_crtc(obj);
 
-	mutex_lock(&crtc->mutex);
+	drm_modeset_lock_crtc(crtc, NULL);
 	if (crtc->fb == NULL) {
 		/* The framebuffer is currently unbound, presumably
 		 * due to a hotplug event, that userspace has not
@@ -3741,7 +3822,7 @@ out:
 		drm_framebuffer_unreference(fb);
 	if (old_fb)
 		drm_framebuffer_unreference(old_fb);
-	mutex_unlock(&crtc->mutex);
+	drm_modeset_unlock_crtc(crtc);
 
 	return ret;
 }

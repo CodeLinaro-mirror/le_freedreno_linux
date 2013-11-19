@@ -27,6 +27,7 @@
 
 #include <linux/i2c.h>
 #include <linux/spinlock.h>
+#include <linux/ww_mutex.h>
 #include <linux/types.h>
 #include <linux/idr.h>
 #include <linux/fb.h>
@@ -316,6 +317,8 @@ struct drm_pending_vblank_event;
 struct drm_plane;
 struct drm_bridge;
 
+extern struct ww_class crtc_ww_class;
+
 /**
  * drm_crtc_funcs - control CRTCs for a given device
  * @save: save CRTC state
@@ -385,6 +388,10 @@ struct drm_crtc_funcs {
  * drm_crtc - central CRTC control structure
  * @dev: parent DRM device
  * @head: list management
+ * @mutex: per-CRTC locking
+ * @in_atomic: is this CRTC part of a still-pending atomic update
+ * @lock_head: used to hold it's place on state->locked_crtcs when
+ *    part of an atomic update
  * @base: base KMS object for ID tracking etc.
  * @enabled: is this CRTC enabled?
  * @mode: current mode timings
@@ -417,7 +424,22 @@ struct drm_crtc {
 	 * state, ...) and a write lock for everything which can be update
 	 * without a full modeset (fb, cursor data, ...)
 	 */
-	struct mutex mutex;
+	struct ww_mutex mutex;
+
+	/**
+	 * Are we locked by someone?  For NONBLOCK atomic updates, the locks
+	 * acquired via drm_modeset_lock_crtc() get dropped in atomic->end(),
+	 * because the rest of the update will come from some other kernel
+	 * thread.  But the crtc is still conceptually locked, and is held
+	 * on the state's locked_crtcs list.
+	 */
+	bool in_atomic;
+
+	/**
+	 * CRTC's that are locked as part of an atomic update are added to
+	 * a list (so we know what to unlock at the end).
+	 */
+	struct list_head lock_head;
 
 	struct drm_mode_object base;
 
@@ -923,6 +945,8 @@ struct drm_prop_enum_list {
 	char *name;
 };
 
+int drm_modeset_lock_crtc(struct drm_crtc *crtc, void *state);
+void drm_modeset_unlock_crtc(struct drm_crtc *crtc);
 extern void drm_modeset_lock_all(struct drm_device *dev);
 extern void drm_modeset_unlock_all(struct drm_device *dev);
 extern void drm_warn_on_modeset_not_all_locked(struct drm_device *dev);

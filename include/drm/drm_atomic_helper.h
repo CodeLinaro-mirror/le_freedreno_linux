@@ -82,6 +82,10 @@ struct drm_atomic_helper_state {
 	struct kref refcount;
 	struct drm_device *dev;
 	uint32_t flags;
+
+	struct ww_acquire_ctx ww_ctx;
+	struct list_head locked_crtcs;
+	bool committed;
 };
 
 static inline void

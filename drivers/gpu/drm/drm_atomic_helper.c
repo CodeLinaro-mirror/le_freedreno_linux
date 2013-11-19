@@ -49,6 +49,9 @@ void *drm_atomic_helper_begin(struct drm_device *dev, uint32_t flags)
 	state = ptr;
 	ptr = &state[1];
 
+	ww_acquire_init(&state->ww_ctx, &crtc_ww_class);
+	INIT_LIST_HEAD(&state->locked_crtcs);
+
 	kref_init(&state->refcount);
 	state->dev = dev;
 	state->flags = flags;
@@ -91,6 +94,103 @@ int drm_atomic_helper_check(struct drm_device *dev, void *state)
 }
 EXPORT_SYMBOL(drm_atomic_helper_check);
 
+/* Note that we drop and re-acquire the locks w/ ww_mutex directly,
+ * since we keep the crtc in our list with in_atomic == true.
+ */
+
+static void drop_locks(struct drm_atomic_helper_state *a,
+		struct ww_acquire_ctx *ww_ctx)
+{
+	struct drm_crtc *crtc;
+
+	mutex_lock(&a->dev->struct_mutex);
+	list_for_each_entry(crtc, &a->locked_crtcs, lock_head)
+		ww_mutex_unlock(&crtc->mutex);
+	mutex_unlock(&a->dev->struct_mutex);
+
+	ww_acquire_fini(ww_ctx);
+}
+
+static void grab_locks(struct drm_atomic_helper_state *a,
+		struct ww_acquire_ctx *ww_ctx)
+{
+	struct drm_crtc *crtc = NULL, *slow_locked = NULL, *contended = NULL;
+	int ret;
+
+
+	ww_acquire_init(ww_ctx, &crtc_ww_class);
+
+	/*
+	 * We need to do proper rain^Hww dance.. another context
+	 * could sneak in a grab the lock in order to check
+	 * crtc->in_atomic, and we get -EDEADLK.  But the winner
+	 * will realize the mistake when it sees crtc->in_atomic
+	 * already set, and then drop lock and return -EBUSY.
+	 * So we just need to keep dancing until we win.
+	 */
+retry:
+	ret = 0;
+	list_for_each_entry(crtc, &a->locked_crtcs, lock_head) {
+		if (crtc == slow_locked) {
+			slow_locked = NULL;
+			continue;
+		}
+		contended = crtc;
+		ret = ww_mutex_lock(&crtc->mutex, ww_ctx);
+		if (ret)
+			goto fail;
+	}
+
+fail:
+	if (ret == -EDEADLK) {
+		/* we lost out in a seqno race, backoff, lock and retry.. */
+
+		list_for_each_entry(crtc, &a->locked_crtcs, lock_head) {
+			if (crtc == contended)
+				break;
+			ww_mutex_unlock(&crtc->mutex);
+		}
+
+		if (slow_locked)
+			ww_mutex_unlock(&slow_locked->mutex);
+
+		ww_mutex_lock_slow(&contended->mutex, ww_ctx);
+		slow_locked = contended;
+		goto retry;
+	}
+	WARN_ON(ret);   /* if we get EALREADY then something is fubar */
+}
+
+static void commit_locks(struct drm_atomic_helper_state *a,
+		struct ww_acquire_ctx *ww_ctx)
+{
+	struct drm_device *dev = a->dev;
+
+	/* and properly release them (clear in_atomic, remove from list): */
+	mutex_lock(&dev->struct_mutex);
+	while (!list_empty(&a->locked_crtcs)) {
+		struct drm_crtc *crtc;
+
+		crtc = list_first_entry(&a->locked_crtcs,
+				struct drm_crtc, lock_head);
+
+		drm_modeset_unlock_crtc(crtc);
+	}
+	mutex_unlock(&dev->struct_mutex);
+	ww_acquire_fini(ww_ctx);
+	a->committed = true;
+}
+
+static int atomic_commit(struct drm_atomic_helper_state *a,
+		struct ww_acquire_ctx *ww_ctx)
+{
+	int ret = 0;
+
+	commit_locks(a, ww_ctx);
+
+	return ret;
+}
+
 /**
  * drm_atomic_helper_commit - commit state
  * @dev: DRM device
@@ -104,7 +204,18 @@ EXPORT_SYMBOL(drm_atomic_helper_check);
  */
 int drm_atomic_helper_commit(struct drm_device *dev, void *state)
 {
-	return 0;  /* for now */
+	struct drm_atomic_helper_state *a = state;
+
+	/* this can be either called synchronously from user ioctl
+	 * call, or for NONBLOCK updates the driver can defer the
+	 * actual commit:
+	 */
+	if (a->ww_ctx.task != current) {
+		struct ww_acquire_ctx ww_ctx;
+		grab_locks(a, &ww_ctx);
+		return atomic_commit(a, &ww_ctx);
+	}
+	return atomic_commit(a, &a->ww_ctx);
 }
 EXPORT_SYMBOL(drm_atomic_helper_commit);
 
@@ -117,15 +228,31 @@ EXPORT_SYMBOL(drm_atomic_helper_commit);
  */
 void drm_atomic_helper_end(struct drm_device *dev, void *state)
 {
+	struct drm_atomic_helper_state *a = state;
+
+	/* if commit is happening from another thread, it will
+	 * block grabbing locks until we drop (and not set
+	 * a->committed until after), so this is not a race:
+	 */
+	if (!a->committed)
+		drop_locks(a, &a->ww_ctx);
+
 	drm_atomic_helper_state_unreference(state);
 }
 EXPORT_SYMBOL(drm_atomic_helper_end);
 
 void _drm_atomic_helper_state_free(struct kref *kref)
 {
-	struct drm_atomic_helper_state *state =
+	struct drm_atomic_helper_state *a =
 		container_of(kref, struct drm_atomic_helper_state, refcount);
-	kfree(state);
+
+	/* in case we haven't already: */
+	if (!a->committed) {
+		grab_locks(a, &a->ww_ctx);
+		commit_locks(a, &a->ww_ctx);
+	}
+
+	kfree(a);
 }
 EXPORT_SYMBOL(_drm_atomic_helper_state_free);
 
