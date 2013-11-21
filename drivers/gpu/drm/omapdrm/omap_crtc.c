@@ -370,6 +370,9 @@ static int omap_crtc_set_property(struct drm_crtc *crtc, void *state,
 	struct drm_crtc_state *cstate = drm_atomic_get_crtc_state(crtc, state);
 	int ret;
 
+	if (IS_ERR(cstate))
+		return PTR_ERR(cstate);
+
 	if (property == priv->rotation_prop) {
 		cstate->invert_dimensions =
 				!!(val & ((1LL << DRM_ROTATE_90) | (1LL << DRM_ROTATE_270)));

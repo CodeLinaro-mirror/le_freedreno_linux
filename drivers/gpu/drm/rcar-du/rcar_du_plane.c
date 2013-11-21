@@ -404,6 +404,10 @@ static int rcar_du_plane_set_property(struct drm_plane *plane,
 {
 	struct rcar_du_plane *rplane = to_rcar_plane(plane);
 	struct rcar_du_group *rgrp = rplane->group;
+	struct drm_plane_state *pstate = drm_atomic_get_plane_state(plane, state);
+
+	if (IS_ERR(pstate))
+		return PTR_ERR(pstate);
 
 	if (property == rgrp->planes.alpha)
 		rcar_du_plane_set_alpha(rplane, value);
@@ -412,8 +416,7 @@ static int rcar_du_plane_set_property(struct drm_plane *plane,
 	else if (property == rgrp->planes.zpos)
 		rcar_du_plane_set_zpos(rplane, value);
 	else
-		return drm_plane_set_property(plane,
-				drm_atomic_get_plane_state(plane, state),
+		return drm_plane_set_property(plane, pstate,
 				property, value, blob_data);
 
 	return 0;

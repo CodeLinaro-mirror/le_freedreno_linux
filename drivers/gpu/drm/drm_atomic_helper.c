@@ -94,6 +94,8 @@ int drm_atomic_helper_set_event(struct drm_device *dev,
 	case DRM_MODE_OBJECT_CRTC: {
 		struct drm_crtc_state *cstate =
 			drm_atomic_get_crtc_state(obj_to_crtc(obj), state);
+		if (IS_ERR(cstate))
+			return PTR_ERR(cstate);
 		cstate->event = event;
 		return 0;
 	}
@@ -285,9 +287,10 @@ EXPORT_SYMBOL(_drm_atomic_helper_state_free);
 int drm_atomic_helper_plane_set_property(struct drm_plane *plane, void *state,
 		struct drm_property *property, uint64_t val, void *blob_data)
 {
-	return drm_plane_set_property(plane,
-			drm_atomic_get_plane_state(plane, state),
-			property, val, blob_data);
+	struct drm_plane_state *pstate = drm_atomic_get_plane_state(plane, state);
+	if (IS_ERR(pstate))
+		return PTR_ERR(pstate);
+	return drm_plane_set_property(plane, pstate, property, val, blob_data);
 }
 EXPORT_SYMBOL(drm_atomic_helper_plane_set_property);
 
@@ -307,13 +310,18 @@ drm_atomic_helper_get_plane_state(struct drm_plane *plane, void *state)
 	struct drm_plane_state *pstate;
 
 	/* grab lock of current crtc: */
-	if (plane->state->crtc)
-		drm_modeset_lock_crtc(plane->state->crtc, state);
+	if (plane->state->crtc) {
+		int ret = drm_modeset_lock_crtc(plane->state->crtc, state);
+		if (ret)
+			return ERR_PTR(ret);
+	}
 
 	pstate = a->pstates[plane->id];
 
 	if (!pstate) {
 		pstate = kzalloc(sizeof(*pstate), GFP_KERNEL);
+		if (!pstate)
+			return ERR_PTR(-ENOMEM);
 		drm_atomic_helper_init_plane_state(plane, pstate, state);
 		a->planes[plane->id] = plane;
 		a->pstates[plane->id] = pstate;
@@ -372,9 +380,10 @@ drm_atomic_helper_commit_plane_state(struct drm_plane *plane,
 int drm_atomic_helper_crtc_set_property(struct drm_crtc *crtc, void *state,
 		struct drm_property *property, uint64_t val, void *blob_data)
 {
-	return drm_crtc_set_property(crtc,
-			drm_atomic_get_crtc_state(crtc, state),
-			property, val, blob_data);
+	struct drm_crtc_state *cstate = drm_atomic_get_crtc_state(crtc, state);
+	if (IS_ERR(cstate))
+		return PTR_ERR(cstate);
+	return drm_crtc_set_property(crtc, cstate, property, val, blob_data);
 }
 EXPORT_SYMBOL(drm_atomic_helper_crtc_set_property);
 
@@ -396,15 +405,18 @@ drm_atomic_helper_get_crtc_state(struct drm_crtc *crtc, void *state)
 {
 	struct drm_atomic_helper_state *a = state;
 	struct drm_crtc_state *cstate;
+	int ret;
 
-	drm_modeset_lock_crtc(crtc, state);
+	ret = drm_modeset_lock_crtc(crtc, state);
+	if (ret)
+		return ERR_PTR(ret);
 
 	cstate = a->cstates[crtc->id];
 
 	if (!cstate) {
 		cstate = kmalloc(sizeof(*cstate), GFP_KERNEL);
 		if (!cstate)
-			return NULL;
+			return ERR_PTR(-ENOMEM);
 		drm_atomic_helper_init_crtc_state(crtc, cstate, state);
 		a->crtcs[crtc->id] = crtc;
 		a->cstates[crtc->id] = cstate;

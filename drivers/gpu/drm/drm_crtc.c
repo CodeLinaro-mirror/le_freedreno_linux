@@ -51,26 +51,30 @@
  */
 int drm_modeset_lock_crtc(struct drm_crtc *crtc, void *state)
 {
-	// ugg, this makes atomic_helper mandatory..  not really
-	// sure yet whether I should care, or just simplify things
-	// and require that drivers use or extend atomic_helper:
-	struct drm_atomic_helper_state *a = state;
-	struct ww_acquire_ctx *ww_ctx = NULL;
-	int ret;
+	if (state) {
+		// ugg, this makes atomic_helper mandatory..  not really
+		// sure yet whether I should care, or just simplify things
+		// and require that drivers use or extend atomic_helper:
+		struct drm_atomic_helper_state *a = state;
+		int ret;
 
-	if (a) {
 		if (a->flags & DRM_MODE_ATOMIC_NOLOCK)
 			return 0;
-		ww_ctx = &a->ww_ctx;
-	}
 
-	ret = ww_mutex_lock(&crtc->mutex, ww_ctx);
-	if (a && !ret) {
-		WARN_ON(!list_empty(&crtc->lock_head));
-		list_add(&crtc->lock_head, &a->locked_crtcs);
-	}
+		ret = ww_mutex_lock(&crtc->mutex, &a->ww_ctx);
+		if (!ret) {
+			WARN_ON(!list_empty(&crtc->lock_head));
+			list_add(&crtc->lock_head, &a->locked_crtcs);
+		} else if (ret == -EALREADY) {
+			/* we already hold the lock.. this is fine */
+			ret = 0;
+		}
 
-	return ret;
+		return ret;
+	} else {
+		ww_mutex_lock(&crtc->mutex, NULL);
+		return 0;
+	}
 }
 EXPORT_SYMBOL(drm_modeset_lock_crtc);
 
@@ -1294,8 +1298,11 @@ int drm_plane_set_property(struct drm_plane *plane,
 		 * plane between crtcs is synchronized on both incoming
 		 * and outgoing crtc.
 		 */
-		if (crtc)
-			drm_modeset_lock_crtc(crtc, state->state);
+		if (crtc) {
+			int ret = drm_modeset_lock_crtc(crtc, state->state);
+			if (ret)
+				return ret;
+		}
 		state->crtc = crtc;
 	} else if (property == config->prop_crtc_x) {
 		state->crtc_x = U642I64(value);
@@ -2341,6 +2348,7 @@ int drm_mode_setplane(struct drm_device *dev, void *data,
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EINVAL;
 
+retry:
 	state = dev->driver->atomic_begin(dev, 0);
 	if (IS_ERR(state))
 		return PTR_ERR(state);
@@ -2382,6 +2390,8 @@ int drm_mode_setplane(struct drm_device *dev, void *data,
 
 out:
 	dev->driver->atomic_end(dev, state);
+	if (ret == -EDEADLK)
+		goto retry;
 	return ret;
 }
 
@@ -2509,6 +2519,7 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 		}
 	}
 
+retry:
 	state = dev->driver->atomic_begin(dev, 0);
 	if (IS_ERR(state))
 		return PTR_ERR(state);
@@ -2536,6 +2547,8 @@ out:
 	if (state)
 		dev->driver->atomic_end(dev, state);
 	kfree(connector_ids);
+	if (ret == -EDEADLK)
+		goto retry;
 	return ret;
 }
 
@@ -4037,6 +4050,7 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 		return -ENOENT;
 	crtc = obj_to_crtc(obj);
 
+retry:
 	state = dev->driver->atomic_begin(dev,
 			page_flip->flags | DRM_MODE_ATOMIC_NONBLOCK);
 	if (IS_ERR(state))
@@ -4069,6 +4083,8 @@ out:
 	if (ret && e)
 		destroy_vblank_event(dev, file_priv, e);
 	dev->driver->atomic_end(dev, state);
+	if (ret == -EDEADLK)
+		goto retry;
 	return ret;
 }
 
@@ -4477,6 +4493,7 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 			(arg->flags & DRM_MODE_PAGE_FLIP_EVENT))
 		return -EINVAL;
 
+retry:
 	state = dev->driver->atomic_begin(dev, arg->flags);
 	if (IS_ERR(state)) {
 		ret = PTR_ERR(state);
@@ -4603,6 +4620,8 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 
  out:
 	dev->driver->atomic_end(dev, state);
+	if (ret == -EDEADLK)
+		goto retry;
 
 	return ret;
 }
