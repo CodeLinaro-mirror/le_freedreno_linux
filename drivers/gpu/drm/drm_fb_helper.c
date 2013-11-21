@@ -276,12 +276,15 @@ EXPORT_SYMBOL(drm_fb_helper_debug_leave);
 /**
  * drm_fb_helper_restore_fbdev_mode - restore fbdev configuration
  * @fb_helper: fbcon to restore
+ * @lockless: true in drm_fb_helper_force_kernel_mode() path, to avoid
+ *   blocking in panic case, everywhere else should use false
  *
  * This should be called from driver's drm ->lastclose callback
  * when implementing an fbcon on top of kms using this helper. This ensures that
  * the user isn't greeted with a black screen when e.g. X dies.
  */
-bool drm_fb_helper_restore_fbdev_mode(struct drm_fb_helper *fb_helper)
+bool drm_fb_helper_restore_fbdev_mode(struct drm_fb_helper *fb_helper,
+		bool lockless)
 {
 	struct drm_device *dev = fb_helper->dev;
 	struct drm_plane *plane;
@@ -289,9 +292,8 @@ bool drm_fb_helper_restore_fbdev_mode(struct drm_fb_helper *fb_helper)
 	void *state;
 	int i;
 
-	drm_warn_on_modeset_not_all_locked(dev);
-
-	state = dev->driver->atomic_begin(dev, 0);
+	state = dev->driver->atomic_begin(dev, lockless ?
+			DRM_MODE_ATOMIC_NOLOCK : 0);
 	if (IS_ERR(state)) {
 		DRM_ERROR("failed to restore fbdev mode\n");
 		return true;
@@ -344,7 +346,7 @@ static bool drm_fb_helper_force_kernel_mode(void)
 		if (helper->dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 			continue;
 
-		ret = drm_fb_helper_restore_fbdev_mode(helper);
+		ret = drm_fb_helper_restore_fbdev_mode(helper, true);
 		if (ret)
 			error = true;
 	}
@@ -827,7 +829,6 @@ EXPORT_SYMBOL(drm_fb_helper_check_var);
 int drm_fb_helper_set_par(struct fb_info *info)
 {
 	struct drm_fb_helper *fb_helper = info->par;
-	struct drm_device *dev = fb_helper->dev;
 	struct fb_var_screeninfo *var = &info->var;
 
 	if (var->pixclock != 0) {
@@ -835,9 +836,7 @@ int drm_fb_helper_set_par(struct fb_info *info)
 		return -EINVAL;
 	}
 
-	drm_modeset_lock_all(dev);
-	drm_fb_helper_restore_fbdev_mode(fb_helper);
-	drm_modeset_unlock_all(dev);
+	drm_fb_helper_restore_fbdev_mode(fb_helper, false);
 
 	if (fb_helper->delayed_hotplug) {
 		fb_helper->delayed_hotplug = false;
