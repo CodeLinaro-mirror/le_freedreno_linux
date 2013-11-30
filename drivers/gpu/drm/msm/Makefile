@@ -17,10 +17,15 @@ msm-y := \
 	mdp/mdp_kms.o \
 	mdp/mdp4/mdp4_crtc.o \
 	mdp/mdp4/mdp4_dtv_encoder.o \
-	mdp/mdp4/mdp4_format.o \
 	mdp/mdp4/mdp4_irq.o \
 	mdp/mdp4/mdp4_kms.o \
 	mdp/mdp4/mdp4_plane.o \
+	mdp/mdp5/mdp5_crtc.o \
+	mdp/mdp5/mdp5_encoder.o \
+	mdp/mdp5/mdp5_irq.o \
+	mdp/mdp5/mdp5_kms.o \
+	mdp/mdp5/mdp5_plane.o \
+	mdp/mdp5/mdp5_smp.o \
 	msm_drv.o \
 	msm_fb.o \
 	msm_gem.o \
