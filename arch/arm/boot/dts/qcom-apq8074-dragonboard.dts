@@ -3,4 +3,5 @@
 / {
 	model = "Qualcomm APQ8074 Dragonboard";
 	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
+	qcom,msm-id = <184 10 0x20000>;
 };
