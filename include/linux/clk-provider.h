@@ -108,6 +108,18 @@ struct clk_hw;
  *		which is likely helpful for most .set_rate implementation.
  *		Returns 0 on success, -EERROR otherwise.
  *
+ * @set_rate_and_parent: Change the rate and the parent of this clock. The
+ *		requested rate is specified by the second argument, which
+ *		should typically be the return of .round_rate call.  The
+ *		third argument gives the parent rate which is likely helpful
+ *		for most .set_rate_and_parent implementation. The fourth
+ *		argument gives the parent index. This callback is optional (and
+ *		unnecessary) for clocks with 0 or 1 parents as well as
+ *		for clocks that can tolerate switching the rate and the parent
+ *		separately via calls to .set_parent and .set_rate.
+ *		Returns 0 on success, -EERROR otherwise.
+ *
+ *
  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
  * implementations to split any work between atomic (enable) and sleepable
  * (prepare) contexts.  If enabling a clock requires code that might sleep,
@@ -139,8 +151,13 @@ struct clk_ops {
 	u8		(*get_parent)(struct clk_hw *hw);
 	int		(*set_rate)(struct clk_hw *hw, unsigned long,
 				    unsigned long);
+	int		(*set_rate_and_parent)(struct clk_hw *hw,
+				    unsigned long rate,
+				    unsigned long parent_rate, u8 index);
 	void		(*init)(struct clk_hw *hw);
 };
+
+struct regmap;
 
 /**
  * struct clk_init_data - holds init data that's common to all clocks and is
@@ -151,6 +168,7 @@ struct clk_ops {
  * @parent_names: array of string names for all possible parents
  * @num_parents: number of possible parents
  * @flags: framework-level hints and quirks
+ * @regmap: regmap to use for regmap helpers and/or by providers
  */
 struct clk_init_data {
 	const char		*name;
@@ -158,6 +176,7 @@ struct clk_init_data {
 	const char		**parent_names;
 	u8			num_parents;
 	unsigned long		flags;
+	struct regmap		*regmap;
 };
 
 /**
@@ -171,10 +190,23 @@ struct clk_init_data {
  *
  * @init: pointer to struct clk_init_data that contains the init data shared
  * with the common clock framework.
+ *
+ * @regmap: regmap to use for regmap helpers and/or by providers
+ *
+ * @enable_reg: register when using regmap enable/disable ops
+ *
+ * @enable_mask: mask when using regmap enable/disable ops
+ *
+ * @enable_is_inverted: flag to indicate set enable_mask bits to disable
+ *                      when using clock_enable_regmap and friends APIs.
  */
 struct clk_hw {
 	struct clk *clk;
 	const struct clk_init_data *init;
+	struct regmap *regmap;
+	unsigned int enable_reg;
+	unsigned int enable_mask;
+	bool enable_is_inverted;
 };
 
 /*
@@ -440,6 +472,9 @@ struct clk *__clk_lookup(const char *name);
 long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
 			      unsigned long *best_parent_rate,
 			      struct clk **best_parent_p);
+int clk_is_enabled_regmap(struct clk_hw *hw);
+int clk_enable_regmap(struct clk_hw *hw);
+void clk_disable_regmap(struct clk_hw *hw);
 
 /*
  * FIXME clock api without lock protection
