@@ -16,7 +16,7 @@ config ARCH_MSM7X00A
 	select MACH_TROUT if !MACH_HALIBUT
 	select MSM_PROC_COMM
 	select MSM_SMD
-	select MSM_SMD_PKG3
+	select MSM_REMOTE_SPINLOCK_SWP
 
 config ARCH_MSM7X30
 	bool "MSM7x30"
@@ -28,6 +28,7 @@ config ARCH_MSM7X30
 	select MSM_PROC_COMM
 	select MSM_SMD
 	select MSM_VIC
+	select MSM_REMOTE_SPINLOCK_DEKKERS
 
 config ARCH_QSD8X50
 	bool "QSD8X50"
@@ -39,6 +40,7 @@ config ARCH_QSD8X50
 	select MSM_PROC_COMM
 	select MSM_SMD
 	select MSM_VIC
+	select MSM_REMOTE_SPINLOCK_LDREX
 
 endchoice
 
@@ -74,6 +76,8 @@ config ARCH_MSM_DT
 	bool
 	select SPARSE_IRQ
 	select USE_OF
+	select MSM_REMOTE_SPINLOCK_AUTO
+	select MSM_SMD
 
 config MSM_HAS_DEBUG_UART_HS
 	bool
@@ -89,6 +93,26 @@ config  ARCH_MSM_SCORPION
 
 config  MSM_VIC
 	bool
+
+config MSM_RPM_SMD
+	depends on MSM_SMD
+	bool "RPM driver using SMD protocol"
+	help
+	  RPM is the dedicated hardware engine for managing shared SoC
+	  resources. This config adds driver support for using SMD as a
+	  transport layer communication with RPM hardware.
+
+config MSM_RPM_REGULATOR_SMD
+	bool "SMD RPM regulator driver"
+	depends on REGULATOR
+	depends on OF
+	depends on MSM_RPM_SMD
+	help
+	  Compile in support for the SMD RPM regulator driver which is used for
+	  setting voltages and other parameters of the various power rails
+	  supplied by some Qualcomm PMICs.  The SMD RPM regulator driver should
+	  be used on systems which contain an RPM which communicates with the
+	  application processor over SMD.
 
 menu "Qualcomm MSM Board Type"
 	depends on !ARCH_MSM_DT
@@ -128,14 +152,75 @@ config MACH_QSD8X50A_ST1_5
 
 endmenu
 
-config MSM_SMD_PKG3
-	bool
-
 config MSM_PROC_COMM
 	bool
 
-config MSM_SMD
+choice
+	prompt "Remote Spinlock Implementation"
+	default MSM_REMOTE_SPINLOCK_AUTO
+
+config MSM_REMOTE_SPINLOCK_DEKKERS
+	prompt "Dekker's algorithm"
 	bool
+config MSM_REMOTE_SPINLOCK_SWP
+	prompt "SWP-based locks"
+	depends on !THUMB2_KERNEL
+	bool
+config MSM_REMOTE_SPINLOCK_LDREX
+	prompt "LDREX/STREX"
+	bool
+config MSM_REMOTE_SPINLOCK_SFPB
+	prompt "SFPB Hardware Mutex Registers"
+	bool
+config MSM_REMOTE_SPINLOCK_AUTO
+	prompt "Use DT info to configure; fallback to LDREX"
+	bool
+
+endchoice
+
+config MSM_SMEM
+	bool
+
+config MSM_SMD
+	bool "MSM Shared Memory Driver (SMD)"
+	select MSM_SMEM
+	help
+	  Support for the shared memory interface between the apps
+	  processor and the baseband processor.  Provides access to
+	  the "shared heap", as well as virtual serial channels
+	  used to communicate with various services on the baseband
+	  processor.
+
+choice
+	prompt "MSM Shared memory interface version"
+	depends on MSM_SMD
+	default MSM_SMD_PKG3 if ARCH_MSM_ARM11
+	default MSM_SMD_PKG4 if (ARCH_MSM_SCORPION || ARCH_MSM_DT)
+
+	config MSM_SMD_PKG3
+	  bool
+	    prompt "Package 3"
+
+	config MSM_SMD_PKG4
+	  bool
+	    prompt "Package 4"
+endchoice
+
+config MSM_N_WAY_SMD
+	depends on (MSM_SMD && !(ARCH_MSM7X01A))
+	default y
+	bool "MSM N-WAY SMD support"
+	help
+	  Supports APPS-QDSP SMD communication along with
+	  normal APPS-MODEM SMD communication.
+
+config MSM_N_WAY_SMSM
+	depends on (MSM_SMD && !(ARCH_MSM7X01A))
+	default y
+	bool "MSM N-WAY SMSM support"
+	help
+	  Supports APPS-QDSP SMSM communication along with
+	  normal APPS-MODEM SMSM communication.
 
 config MSM_GPIOMUX
 	bool
