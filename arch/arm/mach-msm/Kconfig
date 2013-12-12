@@ -71,6 +71,8 @@ config ARCH_MSM8974
 	select HAVE_SMP
 	select MSM_SCM if SMP
 	select USE_OF
+	select PINCTRL
+	select PINCTRL_MSM8X74
 
 config ARCH_MSM_DT
 	bool
