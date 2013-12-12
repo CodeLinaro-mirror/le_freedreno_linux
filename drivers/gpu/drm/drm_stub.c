@@ -567,10 +567,13 @@ err_unload:
 		dev->driver->unload(dev);
 err_primary_node:
 	drm_put_minor(dev->primary);
+	dev->primary = NULL;
 err_render_node:
 	drm_put_minor(dev->render);
+	dev->render = NULL;
 err_control_node:
 	drm_put_minor(dev->control);
+	dev->control = NULL;
 err_agp:
 	if (dev->driver->bus->agp_destroy)
 		dev->driver->bus->agp_destroy(dev);
