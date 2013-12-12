@@ -110,5 +110,48 @@
 			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
 			clock-names = "core", "iface";
 		};
+
+		gdsc_mdss: qcom,gdsc@fd8c2304 {
+			compatible = "qcom,gdsc";
+			regulator-name = "gdsc_mdss";
+			reg = <0xfd8c2304 0x4>;
+			qcom,clock-names = "core_clk", "lut_clk";
+			status = "ok";
+		};
+
+		msmgpio: gpio@fd510000 {
+			compatible = "qcom,msm-gpio";
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			reg = <0xfd510000 0x4000>;
+			ngpio = <146>;
+			interrupts = <0 208 0>;
+			qcom,direct-connect-irqs = <8>;
+		};
+
+		mdss_mdp: qcom,mdss_mdp@fd900000 {
+			compatible = "qcom,mdss_mdp";
+			reg = <0xfd900000 0x22100>,
+				<0xfd924000 0x1000>;
+			reg-names = "mdp_phys", "vbif_phys";
+			interrupts = <0 72 0>;
+			vdd-supply = <&gdsc_mdss>;
+		};
+
+		mdss_hdmi_tx: qcom,hdmi_tx@fd922100 {
+			cell-index = <0>;
+			compatible = "qcom,hdmi-tx";
+			reg =	<0xfd922100 0x35C>,
+				<0xfd922500 0x7C>,
+				<0xfc4b8000 0x60F0>;
+			reg-names = "core_physical", "phy_physical", "qfprom_physical";
+
+			qcom,hdmi-tx-cec = <&msmgpio 31 0>;
+			qcom,hdmi-tx-ddc-clk = <&msmgpio 32 0>;
+			qcom,hdmi-tx-ddc-data = <&msmgpio 33 0>;
+			qcom,hdmi-tx-hpd = <&msmgpio 34 0>;
+		};
 	};
 };
