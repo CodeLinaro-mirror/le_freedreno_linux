@@ -906,7 +906,8 @@ static int compare_of(struct device *dev, void *data)
 	return dev->of_node == data;
 }
 
-static int msm_drm_add_components(struct device *master, struct master *m)
+static int add_components(struct device *master, struct master *m,
+		const char *name)
 {
 	struct device_node *np = master->of_node;
 	unsigned i;
@@ -915,16 +916,35 @@ static int msm_drm_add_components(struct device *master, struct master *m)
 	for (i = 0; ; i++) {
 		struct device_node *node;
 
-		node = of_parse_phandle(np, "connectors", i);
+		node = of_parse_phandle(np, name, i);
 		if (!node)
 			break;
 
 		ret = component_master_add_child(m, compare_of, node);
 		of_node_put(node);
 
-		if (ret)
+		if (ret) {
+			dev_err(master, "could not add %s child %s: %d\n",
+					name, node->name, ret);
 			return ret;
+		}
 	}
+
+	return 0;
+}
+
+static int msm_drm_add_components(struct device *master, struct master *m)
+{
+	int ret;
+
+	ret = add_components(master, m, "connectors");
+	if (ret)
+		return ret;
+
+	ret = add_components(master, m, "gpus");
+	if (ret)
+		return ret;
+
 	return 0;
 }
 #else
@@ -1008,7 +1028,8 @@ static const struct platform_device_id msm_id[] = {
 };
 
 static const struct of_device_id dt_match[] = {
-	{ .compatible = "qcom,mdss_mdp" },
+	{ .compatible = "qcom,mdp" },      /* mdp4 */
+	{ .compatible = "qcom,mdss_mdp" }, /* mdp5 */
 	{}
 };
 MODULE_DEVICE_TABLE(of, dt_match);
