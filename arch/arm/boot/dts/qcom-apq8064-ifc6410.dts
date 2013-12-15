@@ -1,0 +1,131 @@
+/dts-v1/;
+
+/include/ "skeleton.dtsi"
+
+#include <dt-bindings/clk/msm-gcc-8960.h>
+#include <dt-bindings/clk/msm-mmcc-8960.h>
+
+/ {
+	model = "Qualcomm APQ8064/IFC6410";
+	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
+	interrupt-parent = <&intc>;
+
+	intc: interrupt-controller@2000000 {
+		compatible = "qcom,msm-qgic2";
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		reg = < 0x02000000 0x1000 >,
+		      < 0x02002000 0x1000 >;
+	};
+
+	timer@200a000 {
+		compatible = "qcom,kpss-timer", "qcom,msm-timer";
+		interrupts = <1 1 0x301>,
+			     <1 2 0x301>,
+			     <1 3 0x301>;
+		reg = <0x0200a000 0x100>;
+		clock-frequency = <27000000>,
+				  <32768>;
+		cpu-offset = <0x80000>;
+	};
+
+	msmgpio: gpio@800000 {
+		compatible = "qcom,msm-gpio";
+		gpio-controller;
+		#gpio-cells = <2>;
+		ngpio = <150>;
+		interrupts = <0 32 0x4>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		reg = <0x00800000 0x4000>;
+	};
+
+	serial@16640000 {
+		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+		reg = <0x16640000 0x1000>,
+		      <0x16600000 0x1000>;
+		interrupts = <0 154 0x0>;
+		clocks = <&gcc GSBI5_UART_CLK>, <&gcc GSBI5_H_CLK>;
+		clock-names = "core", "iface";
+	};
+
+	qcom,ssbi@500000 {
+		compatible = "qcom,ssbi";
+		reg = <0x00500000 0x1000>;
+		qcom,controller-type = "pmic-arbiter";
+	};
+
+	gcc: clock-controller@900000 {
+		compatible = "qcom,gcc-8960", "qcom,gcc";
+		reg = <0x00900000 0x4000>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+	};
+
+	mmcc: clock-controller@4000000 {
+		compatible = "qcom,mmcc-8960", "qcom,mmcc";
+		reg = <0x04000000 0x1000>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+	};
+
+	gpu: qcom,kgsl-3d0@4300000 {
+		compatible = "qcom,kgsl-3d0";
+		reg = <0x04300000 0x20000>;
+		qcom,chipid = <0x03020100>;
+
+		qcom,gpu-pwrlevels {
+			compatible = "qcom,gpu-pwrlevels";
+
+			qcom,gpu-pwrlevel@0 {
+				qcom,gpu-freq = <450000000>;
+			};
+
+			qcom,gpu-pwrlevel@1 {
+				qcom,gpu-freq = <27000000>;
+			};
+		};
+	};
+
+	hdmi: qcom,hdmi-tx@4a00000 {
+		compatible = "qcom,hdmi-tx";
+		reg-names = "core_physical";
+		reg = <0x04a00000 0x1000>;
+		clock-names =
+		    "core_clk",
+		    "master_iface_clk",
+		    "slave_iface_clk";
+		clocks =
+		    <&mmcc HDMI_APP_CLK>,
+		    <&mmcc HDMI_M_AHB_CLK>,
+		    <&mmcc HDMI_S_AHB_CLK>;
+		qcom,hdmi-phy = "8960";
+		qcom,hdmi-tx-ddc-clk = <&msmgpio 70 0>;
+		qcom,hdmi-tx-ddc-data = <&msmgpio 71 0>;
+		qcom,hdmi-tx-hpd = <&msmgpio 72 0>;
+	};
+
+	mdp: qcom,mdp@5100000 {
+		compatible = "qcom,mdp";
+		reg = <0x05100000 0xf0000>;
+		interrupts = <0 107 0>;
+		hdmi = <&hdmi>;
+		gpu = <&gpu>;
+		clock-names =
+		    "core_clk",
+		    "iface_clk",
+		    "lut_clk",
+		    "src_clk",
+		    "hdmi_clk",
+		    "mdp_clk";
+		clocks =
+		    <&mmcc MDP_SRC>,
+		    <&mmcc MDP_AHB_CLK>,
+		    <&mmcc MDP_LUT_CLK>,
+		    <&mmcc TV_SRC>,
+		    <&mmcc HDMI_TV_CLK>,
+		    <&mmcc MDP_TV_CLK>;
+// need footswitch!
+//		vdd-supply = <&gdsc_mdss>;
+	};
+};

@@ -23,6 +23,7 @@ static const char * const msm_dt_match[] __initconst = {
 	"qcom,msm8660-fluid",
 	"qcom,msm8660-surf",
 	"qcom,msm8960-cdp",
+	"qcom,apq8064-ifc6410",
 	NULL
 };
 
