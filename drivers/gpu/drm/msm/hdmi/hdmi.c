@@ -267,21 +267,45 @@ static int hdmi_dev_probe(struct platform_device *pdev)
 	}
 
 	/* TODO actually use DT.. */
-	static const char *hpd_reg_names[] = {"hpd-gdsc", "hpd-5v"};
-	static const char *pwr_reg_names[] = {"core-vdda", "core-vcc"};
-	static const char *hpd_clk_names[] = {"iface_clk", "core_clk", "mdp_core_clk"};
-	static const char *pwr_clk_names[] = {"extp_clk", "alt_iface_clk"};
+	const char *phy;
+	int ret;
 
-	config.phy_init      = hdmi_phy_8x74_init;
+	ret = of_property_read_string(of_node, "qcom,hdmi-phy", &phy);
+	if (ret) {
+		dev_err(&pdev->dev, "no qcom,hdmi-phy\n");
+		return ret;
+	}
+
+	if (!strcmp(phy, "8x74")) {
+		// XXX hack.. we really should pull all this from DT:
+		static const char *pwr_reg_names[] = {"core-vdda", "core-vcc"};
+		static const char *pwr_clk_names[] = {"extp_clk", "alt_iface_clk"};
+		static const char *hpd_reg_names[] = {"hpd-gdsc", "hpd-5v"};
+		static const char *hpd_clk_names[] = {"iface_clk", "core_clk", "mdp_core_clk"};
+		config.phy_init      = hdmi_phy_8x74_init;
+		config.pwr_reg_names = pwr_reg_names;
+		config.pwr_reg_cnt   = ARRAY_SIZE(pwr_reg_names);
+		config.pwr_clk_names = pwr_clk_names;
+		config.pwr_clk_cnt   = ARRAY_SIZE(pwr_clk_names);
+		config.hpd_reg_names = hpd_reg_names;
+		config.hpd_reg_cnt   = ARRAY_SIZE(hpd_reg_names);
+		config.hpd_clk_names = hpd_clk_names;
+		config.hpd_clk_cnt   = ARRAY_SIZE(hpd_clk_names);
+	} else if (!strcmp(phy, "8960")) {
+		static const char *hpd_clk_names[] = {"core_clk", "master_iface_clk", "slave_iface_clk"};
+		static const char *hpd_reg_names[] = {"8921_hdmi_mvs"};
+		config.phy_init      = hdmi_phy_8960_init;
+		config.hpd_reg_names = hpd_reg_names;
+		config.hpd_reg_cnt   = ARRAY_SIZE(hpd_reg_names);
+		config.hpd_clk_names = hpd_clk_names;
+		config.hpd_clk_cnt   = ARRAY_SIZE(hpd_clk_names);
+	} else if (!strcmp(phy, "8x60")) {
+		config.phy_init      = hdmi_phy_8x60_init;
+	} else {
+		dev_err(&pdev->dev, "unknown phy: %s\n", phy);
+	}
+
 	config.mmio_name     = "core_physical";
-	config.hpd_reg_names = hpd_reg_names;
-	config.hpd_reg_cnt   = ARRAY_SIZE(hpd_reg_names);
-	config.pwr_reg_names = pwr_reg_names;
-	config.pwr_reg_cnt   = ARRAY_SIZE(pwr_reg_names);
-	config.hpd_clk_names = hpd_clk_names;
-	config.hpd_clk_cnt   = ARRAY_SIZE(hpd_clk_names);
-	config.pwr_clk_names = pwr_clk_names;
-	config.pwr_clk_cnt   = ARRAY_SIZE(pwr_clk_names);
 	config.ddc_clk_gpio  = get_gpio("qcom,hdmi-tx-ddc-clk");
 	config.ddc_data_gpio = get_gpio("qcom,hdmi-tx-ddc-data");
 	config.hpd_gpio      = get_gpio("qcom,hdmi-tx-hpd");

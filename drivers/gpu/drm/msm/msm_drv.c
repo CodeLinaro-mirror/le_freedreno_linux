@@ -841,7 +841,8 @@ static const struct platform_device_id msm_id[] = {
 };
 
 static const struct of_device_id dt_match[] = {
-	{ .compatible = "qcom,mdss_mdp" },
+	{ .compatible = "qcom,mdp" },      /* mdp4 */
+	{ .compatible = "qcom,mdss_mdp" }, /* mdp5 */
 	{}
 };
 MODULE_DEVICE_TABLE(of, dt_match);

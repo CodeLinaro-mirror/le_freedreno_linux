@@ -290,15 +290,17 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 		goto fail;
 	}
 
-	mdp4_kms->dsi_pll_vdda = devm_regulator_get(&pdev->dev, "dsi_pll_vdda");
+	mdp4_kms->dsi_pll_vdda =
+			devm_regulator_get_optional(&pdev->dev, "dsi_pll_vdda");
 	if (IS_ERR(mdp4_kms->dsi_pll_vdda))
 		mdp4_kms->dsi_pll_vdda = NULL;
 
-	mdp4_kms->dsi_pll_vddio = devm_regulator_get(&pdev->dev, "dsi_pll_vddio");
+	mdp4_kms->dsi_pll_vddio =
+			devm_regulator_get_optional(&pdev->dev, "dsi_pll_vddio");
 	if (IS_ERR(mdp4_kms->dsi_pll_vddio))
 		mdp4_kms->dsi_pll_vddio = NULL;
 
-	mdp4_kms->vdd = devm_regulator_get(&pdev->dev, "vdd");
+	mdp4_kms->vdd = devm_regulator_get_exclusive(&pdev->dev, "vdd");
 	if (IS_ERR(mdp4_kms->vdd))
 		mdp4_kms->vdd = NULL;
 
@@ -311,6 +313,12 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 	}
 
 	mdp4_kms->clk = devm_clk_get(&pdev->dev, "core_clk");
+
+	// hack.. if mmcc is not probed yet, we get -ENOENT instead of
+	// -EPROBE_DEFER.. which seems like a bug in of_clk_get_from_provider()
+	if (mdp4_kms->clk == ERR_PTR(-ENOENT))
+		mdp4_kms->clk = ERR_PTR(-EPROBE_DEFER);
+
 	if (IS_ERR(mdp4_kms->clk)) {
 		dev_err(dev->dev, "failed to get core_clk\n");
 		ret = PTR_ERR(mdp4_kms->clk);
@@ -385,6 +393,8 @@ static struct mdp4_platform_config *mdp4_get_config(struct platform_device *dev)
 	static struct mdp4_platform_config config = {};
 #ifdef CONFIG_OF
 	/* TODO */
+	config.max_clk = 266667000;
+	config.iommu = iommu_domain_alloc(&platform_bus_type);
 #else
 	if (cpu_is_apq8064())
 		config.max_clk = 266667000;
