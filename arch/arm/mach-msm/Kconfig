@@ -116,6 +116,13 @@ config MSM_RPM_REGULATOR_SMD
 	  be used on systems which contain an RPM which communicates with the
 	  application processor over SMD.
 
+config MSM_FOOTSWITCH_8X60
+	bool "Support for 8x60 and 8960 footswitch regulators"
+	depends on REGULATOR
+	depends on OF
+	help
+	  Compile in support for 8x60 footswitch regulators.
+
 menu "Qualcomm MSM Board Type"
 	depends on !ARCH_MSM_DT
 

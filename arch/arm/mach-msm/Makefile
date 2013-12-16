@@ -18,6 +18,8 @@ obj-$(CONFIG_ARCH_MSM8226) += gdsc.o
 obj-$(CONFIG_ARCH_MSM8610) += gdsc.o
 obj-$(CONFIG_ARCH_MPQ8092) += gdsc.o
 
+obj-$(CONFIG_MSM_FOOTSWITCH_8X60) += footswitch-8x60.o
+
 obj-$(CONFIG_MSM_SMEM) += smem.o remote_spinlock.o
 obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o smd_private.o
 obj-$(CONFIG_MSM_SMD) += last_radio_log.o
