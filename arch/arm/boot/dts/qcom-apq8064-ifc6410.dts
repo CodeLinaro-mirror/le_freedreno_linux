@@ -4,6 +4,7 @@
 
 #include <dt-bindings/clk/msm-gcc-8960.h>
 #include <dt-bindings/clk/msm-mmcc-8960.h>
+#include <dt-bindings/reset/msm-mmcc-8960.h>
 
 / {
 	model = "Qualcomm APQ8064/IFC6410";
@@ -69,6 +70,64 @@
 		#reset-cells = <1>;
 	};
 
+	footswitch_mdp: footswitch@4 {
+		compatible = "qcom,footswitch-8x60";
+		cell-index = <4>;
+		reg = <0x04000000 0x1000>;
+		clock-names =
+		    "core_clk",
+		    "iface_clk",
+		    "bus_clk",
+		    "vsync_clk",
+		    "lut_clk",
+		    "src_clk",
+		    "mdp_clk",
+		    "reset1_clk",
+		    "reset2_clk";
+		clocks =
+		    <&mmcc MDP_SRC>,
+		    <&mmcc MDP_AHB_CLK>,
+		    <&mmcc MDP_AXI_CLK>,
+		    <&mmcc MDP_VSYNC_CLK>,
+		    <&mmcc MDP_LUT_CLK>,
+		    <&mmcc TV_SRC>,
+		    <&mmcc MDP_TV_CLK>,
+		    <&mmcc DSI_RESET>,
+		    <&mmcc DSI2_RESET>;
+		qcom,footswitch-name = "vdd";
+		qcom,footswitch-consumer = "mdp.0";
+		qcom,footswitch-clks {
+			compatible = "qcom,footswitch-clks";
+			qcom,footswitch-clk@0 {
+				qcom,clk-name = "core_clk";
+			};
+			qcom,footswitch-clk@1 {
+				qcom,clk-name = "iface_clk";
+			};
+			qcom,footswitch-clk@2 {
+				qcom,clk-name = "bus_clk";
+			};
+			qcom,footswitch-clk@3 {
+				qcom,clk-name = "vsync_clk";
+			};
+			qcom,footswitch-clk@4 {
+				qcom,clk-name = "lut_clk";
+			};
+			qcom,footswitch-clk@5 {
+				qcom,clk-name = "src_clk";
+			};
+			qcom,footswitch-clk@6 {
+				qcom,clk-name = "mdp_clk";
+			};
+			qcom,footswitch-clk@7 {
+				qcom,clk-name = "reset1_clk";
+			};
+			qcom,footswitch-clk@8 {
+				qcom,clk-name = "reset2_clk";
+			};
+		};
+	};
+
 	gpu: qcom,kgsl-3d0@4300000 {
 		compatible = "qcom,kgsl-3d0";
 		reg = <0x04300000 0x20000>;
@@ -125,7 +184,6 @@
 		    <&mmcc TV_SRC>,
 		    <&mmcc HDMI_TV_CLK>,
 		    <&mmcc MDP_TV_CLK>;
-// need footswitch!
-//		vdd-supply = <&gdsc_mdss>;
+		vdd-supply = <&footswitch_mdp>;
 	};
 };
