@@ -16,12 +16,14 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/ssbi.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/pm8xxx/pm8921.h>
 #include <linux/mfd/pm8xxx/core.h>
+#include <linux/regulator/pm8xxx-regulator.h>
 
 #define REG_HWREV		0x002  /* PMIC4 revision */
 #define REG_HWREV_2		0x0E8  /* PMIC4 revision 2 */
@@ -105,15 +107,46 @@ static int pm8921_add_subdevices(const struct pm8921_platform_data
 	return ret;
 }
 
+static int pm8921_add_of_subdevices(struct device_node *np,
+		struct pm8921 *pmic, u32 rev)
+{
+	struct device_node *child;
+	int ret = 0, irq_base = 0, idx = 0;
+
+	for_each_child_of_node(np, child) {
+		if (of_device_is_compatible(child, "qcom,pm8xxx-regulator")) {
+			struct mfd_cell reg_cell = {
+					.name = PM8XXX_REGULATOR_DEV_NAME,
+					.of_compatible = "qcom,pm8xxx-regulator",
+					.id = ++idx,
+
+			};
+			ret = mfd_add_devices(pmic->dev, 0, &reg_cell, 1,
+					NULL, irq_base, NULL);
+			if (ret) {
+				dev_err(pmic->dev, "failed to add regulator: %d\n", ret);
+				goto fail;
+			}
+		}
+		/* looks like we don't need irq_chip yet, so skip that for now..
+		 * first one to need it gets to do the DT port ;-)
+		 */
+	}
+
+fail:
+	return ret;
+}
+
 static int pm8921_probe(struct platform_device *pdev)
 {
 	const struct pm8921_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	struct device_node *np = pdev->dev.of_node;
 	struct pm8921 *pmic;
 	int rc;
 	u8 val;
 	u32 rev;
 
-	if (!pdata) {
+	if (!(pdata || np)) {
 		pr_err("missing platform data\n");
 		return -EINVAL;
 	}
@@ -147,7 +180,11 @@ static int pm8921_probe(struct platform_device *pdev)
 	pm8921_drvdata.pm_chip_data = pmic;
 	platform_set_drvdata(pdev, &pm8921_drvdata);
 
-	rc = pm8921_add_subdevices(pdata, pmic, rev);
+	if (pdata)
+		rc = pm8921_add_subdevices(pdata, pmic, rev);
+	else
+		rc = pm8921_add_of_subdevices(np, pmic, rev);
+
 	if (rc) {
 		pr_err("Cannot add subdevices rc=%d\n", rc);
 		goto err;
@@ -182,12 +219,19 @@ static int pm8921_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id dt_match[] = {
+	{ .compatible = "qcom,pm8921-core" },
+	{}
+};
+MODULE_DEVICE_TABLE(of, dt_match);
+
 static struct platform_driver pm8921_driver = {
 	.probe		= pm8921_probe,
 	.remove		= pm8921_remove,
 	.driver		= {
 		.name	= "pm8921-core",
 		.owner	= THIS_MODULE,
+		.of_match_table = dt_match,
 	},
 };
 
