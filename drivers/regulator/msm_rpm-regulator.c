@@ -128,8 +128,28 @@ static const struct msm_rpm_reg msm8960_ldo16 = {
 	.hpm_min_load = RPM_VREG_8960_LDO_300_HPM_MIN_LOAD,
 };
 
+static struct rpm_reg_parts switch_parts = {
+	.request_len    = 1,
+	.enable_state   = REQUEST_MEMBER(0, 0x00000001,  0),
+	.pd             = REQUEST_MEMBER(0, 0x00000002,  1),
+	.pc             = REQUEST_MEMBER(0, 0x0000003C,  2),
+	.pf             = REQUEST_MEMBER(0, 0x000003C0,  6),
+	.hpm            = REQUEST_MEMBER(0, 0x00000C00, 10),
+};
+
+static const struct msm_rpm_reg msm8960_hdmi_switch = {
+	.resource = MSM_RPM_HDMI_SWITCH,
+
+	.desc.name = "hdmi_switch",
+	.ranges = pldo_ranges,
+	.n_ranges = ARRAY_SIZE(pldo_ranges),
+	.parts = &switch_parts,
+	.hpm_min_load = RPM_VREG_8960_LDO_300_HPM_MIN_LOAD,
+};
+
 static const struct of_device_id rpm_of_match[] = {
 	{ .compatible = "qcom,msm8960-regulator-l16", .data = &msm8960_ldo16 },
+	{ .compatible = "qcom,msm8960-regulator-hdmi", .data = &msm8960_hdmi_switch },
 };
 MODULE_DEVICE_TABLE(of, rpm_of_match);
 

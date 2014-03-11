@@ -9,6 +9,7 @@ enum {
 	MSM_RPM_ACK_CTX,
 	MSM_RPM_ACK_SEL,
 	MSM_RPM_PM8921_L16,
+	MSM_RPM_HDMI_SWITCH,
 };
 
 int msm_rpm_read_status(const struct device *dev, int resource, u32 *buf, size_t count);

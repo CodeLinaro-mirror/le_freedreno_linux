@@ -70,6 +70,7 @@ static const struct msm_rpm_resource msm8960_rpm_resource_table[] = {
 	[MSM_RPM_ACK_CTX] = { .ctrl_id = 15, .count = 7 },
 	[MSM_RPM_ACK_CTX] = { .ctrl_id = 23, .count = 7 },
 	[MSM_RPM_PM8921_L16] = { .target_id = 163, .status_id = 77, .count = 2, .sel = 53 },
+	[MSM_RPM_HDMI_SWITCH] = { .target_id = 211, .status_id = 126, .count = 1, .sel = 83 },
 };
 
 static const struct msm_rpm msm8960_template = {

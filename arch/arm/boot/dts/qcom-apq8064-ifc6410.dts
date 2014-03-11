@@ -80,8 +80,8 @@
 		interrupts = <0 19 0>, <0 21 0>, <0 22 0>;
 		interrupt-names = "ack", "err", "wakeup";
 
-		hdmi_mvs: qcom,msm8960-regulator-l16@1 {
-			compatible = "qcom,msm8960-regulator-l16";
+		hdmi_mvs: qcom,msm8960-regulator-hdmi@1 {
+			compatible = "qcom,msm8960-regulator-hdmi";
 		};
 	};
 
