@@ -32,15 +32,31 @@
 		cpu-offset = <0x80000>;
 	};
 
-	msmgpio: gpio@800000 {
-		compatible = "qcom,msm-gpio";
+	gcc: clock-controller@900000 {
+		compatible = "qcom,gcc-msm8960", "qcom,gcc";
+		reg = <0x00900000 0x4000>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+	};
+
+	mmcc: clock-controller@4000000 {
+		compatible = "qcom,mmcc-msm8960", "qcom,mmcc";
+		reg = <0x04000000 0x1000>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+	};
+
+	msmgpio: pinctrl@800000 {
+		compatible = "qcom,apq8064-pinctrl";
+		reg = <0x800000 0x4000>;
+
 		gpio-controller;
 		#gpio-cells = <2>;
-		ngpio = <150>;
-		interrupts = <GIC_SPI 16 0x4>;
 		interrupt-controller;
 		#interrupt-cells = <2>;
-		reg = <0x00800000 0x4000>;
+		interrupts = <0 32 0x4>;
+
+		pinctrl-names = "default";
 	};
 
 	serial@16640000 {
@@ -52,26 +68,21 @@
 		clock-names = "core", "iface";
 	};
 
+	qcom,ssbi@500000 {
+		compatible = "qcom,ssbi";
+		reg = <0x00500000 0x1000>;
+		qcom,controller-type = "pmic-arbiter";
+	};
+
 	msm_rpm {
 		compatible = "qcom,msm8960-rpm";
 		reg = <0x108000  0x1000 0x02011008 0x4>;
 		interrupts = <0 19 0>, <0 21 0>, <0 22 0>;
 		interrupt-names = "ack", "err", "wakeup";
-	};
 
-	ext_5v: regulator-fixed@0 {
-		compatible = "regulator-fixed";
-
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-
-		regulator-name = "ext_5v";
-		regulator-type = "voltage";
-		startup-delay-us = <0>;
-
-		gpio = <&pm8xxx_mpp 6 GPIO_ACTIVE_HIGH>;
-
-		enable-active-high;
+		hdmi_mvs: qcom,msm8960-regulator-l16@1 {
+			compatible = "qcom,msm8960-regulator-l16";
+		};
 	};
 
 	ext_3p3v: regulator-fixed@1 {
@@ -87,61 +98,6 @@
 		gpio = <&msmgpio 77 GPIO_ACTIVE_HIGH>;
 
 		enable-active-high;
-	};
-
-	qcom,ssbi@500000 {
-		compatible = "qcom,ssbi";
-		reg = <0x00500000 0x1000>;
-		qcom,controller-type = "pmic-arbiter";
-
-		qcom,pm8921-core {
-			compatible = "qcom,pm8921-core";
-
-			qcom,pm8xxx-irq {
-				compatible = "qcom,pm8xxx-irq";
-				qcom,irq-base = <429>;
-				qcom,devirq = <362>;
-			};
-
-			hdmi_mvs: qcom,pm8xxx-regulator@1 {
-				compatible = "qcom,pm8xxx-regulator-vs300", "qcom,pm8xxx-regulator";
-				regulator-name = "8921_hdmi_mvs";
-				qcom,is-pin-controlled = <0>;
-				qcom,vreg-ctrl-addr = <0x070>;
-				qcom,vreg-test-addr = <0x071>;
-				qcom,pdata-pull-down = <1>;
-				qcom,pdata-enable-time = <0>;
-				qcom,pdata-supply-regulator = "ext_5v";
-				ext_5v-supply = <&ext_5v>;
-			};
-
-			pm8xxx_gpio: qcom,pm8xxx-gpio@2 {
-				compatible = "qcom,pm8xxx-gpio";
-				#gpio-cells = <2>;
-				ngpio = <44>;
-			};
-
-			pm8xxx_mpp: qcom,pm8xxx-mpp@3 {
-				compatible = "qcom,pm8xxx-mpp";
-				#gpio-cells = <2>;
-				ngpio = <12>;
-				qcom,mpp-base = <0x050>;
-			};
-		};
-	};
-
-	gcc: clock-controller@900000 {
-		compatible = "qcom,gcc-msm8960", "qcom,gcc";
-		reg = <0x00900000 0x4000>;
-		#clock-cells = <1>;
-		#reset-cells = <1>;
-	};
-
-	mmcc: clock-controller@4000000 {
-		compatible = "qcom,mmcc-msm8960", "qcom,mmcc";
-		reg = <0x04000000 0x1000>;
-		#clock-cells = <1>;
-		#reset-cells = <1>;
 	};
 
 	footswitch_mdp: footswitch@4 {
@@ -238,7 +194,6 @@
 		qcom,hdmi-tx-ddc-data = <&msmgpio 71 GPIO_ACTIVE_HIGH>;
 		qcom,hdmi-tx-hpd = <&msmgpio 72 GPIO_ACTIVE_HIGH>;
 		core-vdda-supply = <&hdmi_mvs>;
-		hdmi-mux-vdd-supply = <&ext_3p3v>;
 	};
 
 	mdp: qcom,mdp@5100000 {
