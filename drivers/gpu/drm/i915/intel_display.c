@@ -10861,6 +10861,7 @@ static const struct drm_crtc_funcs intel_crtc_funcs = {
 	.cursor_move = intel_crtc_cursor_move,
 	.gamma_set = intel_crtc_gamma_set,
 	.set_config = intel_crtc_set_config,
+	.set_property = drm_atomic_crtc_set_property,
 	.destroy = intel_crtc_destroy,
 	.page_flip = intel_crtc_page_flip,
 };
@@ -11005,7 +11006,7 @@ static void intel_crtc_init(struct drm_device *dev, int pipe)
 
 	drm_crtc_helper_add(&intel_crtc->base, &intel_helper_funcs);
 
-	WARN_ON(drm_crtc_index(&intel_crtc->base) != intel_crtc->pipe);
+	WARN_ON(intel_crtc->base.id != intel_crtc->pipe);
 }
 
 enum pipe intel_get_pipe_from_connector(struct intel_connector *connector)
