@@ -957,7 +957,7 @@ EXPORT_SYMBOL(drm_vblank_get);
  */
 int drm_crtc_vblank_get(struct drm_crtc *crtc)
 {
-	return drm_vblank_get(crtc->dev, drm_crtc_index(crtc));
+	return drm_vblank_get(crtc->dev, crtc->index);
 }
 EXPORT_SYMBOL(drm_crtc_vblank_get);
 
@@ -994,7 +994,7 @@ EXPORT_SYMBOL(drm_vblank_put);
  */
 void drm_crtc_vblank_put(struct drm_crtc *crtc)
 {
-	drm_vblank_put(crtc->dev, drm_crtc_index(crtc));
+	drm_vblank_put(crtc->dev, crtc->index);
 }
 EXPORT_SYMBOL(drm_crtc_vblank_put);
 
@@ -1058,7 +1058,7 @@ EXPORT_SYMBOL(drm_vblank_off);
  */
 void drm_crtc_vblank_off(struct drm_crtc *crtc)
 {
-	drm_vblank_off(crtc->dev, drm_crtc_index(crtc));
+	drm_vblank_off(crtc->dev, crtc->index);
 }
 EXPORT_SYMBOL(drm_crtc_vblank_off);
 
@@ -1099,7 +1099,7 @@ EXPORT_SYMBOL(drm_vblank_on);
  */
 void drm_crtc_vblank_on(struct drm_crtc *crtc)
 {
-	drm_vblank_on(crtc->dev, drm_crtc_index(crtc));
+	drm_vblank_on(crtc->dev, crtc->index);
 }
 EXPORT_SYMBOL(drm_crtc_vblank_on);
 
