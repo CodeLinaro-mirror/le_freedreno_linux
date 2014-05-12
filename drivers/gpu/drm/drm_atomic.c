@@ -617,6 +617,7 @@ swap_crtc_state(struct drm_crtc *crtc, struct drm_atomic_state *a)
 	/* clear transient state (only valid during atomic update): */
 	cstate->set_config = false;
 	cstate->connectors_change = false;
+	cstate->commit_state = false;
 
 	swap(crtc->state, a->cstates[crtc->index]);
 	crtc->base.propvals = &crtc->state->propvals;
@@ -690,6 +691,9 @@ commit_crtc_state(struct drm_crtc *crtc,
 	struct drm_plane_state *pstate =
 			drm_atomic_get_plane_state(crtc->primary, cstate->state);
 	int ret = -EINVAL;
+
+	if (!cstate->commit_state)
+		return 0;
 
 	if (cstate->set_config)
 		return set_config(crtc, cstate);
