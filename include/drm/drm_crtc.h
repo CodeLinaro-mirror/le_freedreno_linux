@@ -823,6 +823,23 @@ struct drm_bridge {
 };
 
 /**
+ * struct drm_atomic_state - the global state object for atomic updates
+ */
+struct drm_atomic_state {
+       struct drm_device *dev;
+       uint32_t flags;
+       struct drm_plane **planes;
+       struct drm_plane_state **plane_states;
+       struct drm_crtc **crtcs;
+       struct drm_crtc_state **crtc_states;
+       struct drm_connector **connectors;
+       struct drm_connector_state **connector_states;
+
+       struct drm_modeset_acquire_ctx *acquire_ctx;
+};
+
+
+/**
  * drm_mode_set - new values for a CRTC config change
  * @head: list management
  * @fb: framebuffer to use for new config
@@ -863,6 +880,12 @@ struct drm_mode_config_funcs {
 					     struct drm_file *file_priv,
 					     struct drm_mode_fb_cmd2 *mode_cmd);
 	void (*output_poll_changed)(struct drm_device *dev);
+
+	int (*atomic_check)(struct drm_device *dev,
+			    struct drm_atomic_state *a);
+	int (*atomic_commit)(struct drm_device *dev,
+			     struct drm_atomic_state *a,
+			     bool async);
 };
 
 /**
