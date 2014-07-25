@@ -240,6 +240,9 @@ struct drm_crtc_state {
 	/* computed state bits used by helpers and drivers */
 	bool planes_changed : 1;
 
+	/* adjusted_mode: for use by helpers and drivers */
+	struct drm_display_mode adjusted_mode;
+
 	struct drm_display_mode mode;
 
 	struct drm_pending_vblank_event *event;
