@@ -239,6 +239,10 @@ struct drm_crtc_state {
 
 	/* computed state bits used by helpers and drivers */
 	bool planes_changed : 1;
+	bool mode_changed : 1;
+
+	/* last_vblank_count: for vblank waits before cleanup */
+	u32 last_vblank_count;
 
 	/* adjusted_mode: for use by helpers and drivers */
 	struct drm_display_mode adjusted_mode;
@@ -436,6 +440,9 @@ drm_crtc_destroy_state(struct drm_crtc *crtc,
  */
 struct drm_connector_state {
 	struct drm_crtc *crtc;
+
+	/* best_encoder: for use by helpers and drivers */
+	struct drm_encoder *best_encoder;
 
 	struct drm_atomic_state *state;
 };
