@@ -435,7 +435,7 @@ int drm_plane_helper_update(struct drm_plane *plane, struct drm_crtc *crtc,
 	}
 
 	if (plane_funcs->prepare_fb) {
-		ret = plane_funcs->prepare_fb(plane, fb);
+		ret = plane_funcs->prepare_fb(plane, fb, false);
 		if (ret)
 			goto fail;
 	}
@@ -517,7 +517,7 @@ int drm_plane_helper_disable(struct drm_plane *plane)
 	}
 
 	if (plane_funcs->prepare_fb) {
-		ret = plane_funcs->prepare_fb(plane, fb);
+		ret = plane_funcs->prepare_fb(plane, fb, false);
 		if (ret)
 			goto fail;
 	}

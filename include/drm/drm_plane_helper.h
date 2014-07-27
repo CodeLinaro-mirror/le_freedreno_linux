@@ -49,7 +49,8 @@
  */
 struct drm_plane_helper_funcs {
 	int (*prepare_fb)(struct drm_plane *plane,
-			  struct drm_framebuffer *fb);
+			  struct drm_framebuffer *fb,
+			  bool async);
 	void (*cleanup_fb)(struct drm_plane *plane,
 			   struct drm_framebuffer *fb);
 

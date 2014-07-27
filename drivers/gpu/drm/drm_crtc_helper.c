@@ -1006,7 +1006,7 @@ int drm_helper_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
 	}
 
 	if (plane_funcs->prepare_fb) {
-		ret = plane_funcs->prepare_fb(plane, plane_state->fb);
+		ret = plane_funcs->prepare_fb(plane, plane_state->fb, false);
 		if (ret)
 			goto fail;
 	}

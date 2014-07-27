@@ -703,7 +703,7 @@ int drm_atomic_helper_commit(struct drm_device *dev,
 	if (async)
 		return -EBUSY;
 
-	ret = drm_atomic_helper_prepare_planes(dev, state);
+	ret = drm_atomic_helper_prepare_planes(dev, state, false);
 	if (ret)
 		return ret;
 
@@ -749,16 +749,22 @@ EXPORT_SYMBOL(drm_atomic_helper_commit);
  * drm_atomic_helper_prepare_planes - prepare plane resources after commit
  * @dev: DRM device
  * @state: atomic state object with old state structures
+ * @async: asynchronous commit
  *
  * This function prepares plane state, specifically framebuffers, for the new
  * configuration. If any failure is encountered this function will call
  * ->cleanup_fb on any already successfully prepared framebuffer.
  *
+ * If @async is true the driver callbacks should not wait for outstanding
+ * render, but instead ensure that the asynchronous commit work item is stalled
+ * sufficiently long.
+ *
  * Returns:
  * 0 on success, negative error code on failure.
  */
 int drm_atomic_helper_prepare_planes(struct drm_device *dev,
-				     struct drm_atomic_state *state)
+				     struct drm_atomic_state *state,
+				     bool async)
 {
 	int nplanes = dev->mode_config.num_total_plane;
 	int ret, i;
@@ -776,7 +782,7 @@ int drm_atomic_helper_prepare_planes(struct drm_device *dev,
 		fb = state->plane_states[i]->fb;
 
 		if (fb && funcs->prepare_fb) {
-			ret = funcs->prepare_fb(plane, fb);
+			ret = funcs->prepare_fb(plane, fb, async);
 			if (ret)
 				goto fail;
 		}

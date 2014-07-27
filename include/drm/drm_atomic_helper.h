@@ -40,7 +40,8 @@ void drm_atomic_helper_commit_post_planes(struct drm_device *dev,
 					  struct drm_atomic_state *old_state);
 
 int drm_atomic_helper_prepare_planes(struct drm_device *dev,
-				     struct drm_atomic_state *state);
+				     struct drm_atomic_state *state,
+				     bool async);
 void drm_atomic_helper_commit_planes(struct drm_device *dev,
 				     struct drm_atomic_state *state);
 void drm_atomic_helper_cleanup_planes(struct drm_device *dev,
