@@ -1318,7 +1318,7 @@ backoff:
 /**
  * drm_atomic_helper_crtc_set_property - helper for crtc prorties
  * @crtc: DRM crtc
- * @prorty: DRM property
+ * @property: DRM property
  * @val: value of property
  *
  * Provides a default plane disablle handler using the atomic driver interface.
@@ -1378,7 +1378,7 @@ EXPORT_SYMBOL(drm_atomic_helper_crtc_set_property);
 /**
  * drm_atomic_helper_plane_set_property - helper for plane prorties
  * @plane: DRM plane
- * @prorty: DRM property
+ * @property: DRM property
  * @val: value of property
  *
  * Provides a default plane disablle handler using the atomic driver interface.
@@ -1438,7 +1438,7 @@ EXPORT_SYMBOL(drm_atomic_helper_plane_set_property);
 /**
  * drm_atomic_helper_connector_set_property - helper for connector prorties
  * @connector: DRM connector
- * @prorty: DRM property
+ * @property: DRM property
  * @val: value of property
  *
  * Provides a default plane disablle handler using the atomic driver interface.
@@ -1578,3 +1578,66 @@ backoff:
 	goto retry;
 }
 EXPORT_SYMBOL(drm_atomic_helper_page_flip);
+
+void drm_atomic_helper_crtc_reset(struct drm_crtc *crtc)
+{
+	kfree(crtc->state);
+	crtc->state = kzalloc(sizeof(*crtc->state), GFP_KERNEL);
+}
+EXPORT_SYMBOL(drm_atomic_helper_crtc_reset);
+
+struct drm_crtc_state *
+drm_atomic_helper_crtc_duplicate_state(struct drm_crtc *crtc)
+{
+	return kmemdup(crtc->state, sizeof(*crtc->state), GFP_KERNEL);
+}
+EXPORT_SYMBOL(drm_atomic_helper_crtc_duplicate_state);
+
+void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
+					  struct drm_crtc_state *state)
+{
+	kfree(state);
+}
+EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
+
+void drm_atomic_helper_plane_reset(struct drm_plane *plane)
+{
+	kfree(plane->state);
+	plane->state = kzalloc(sizeof(*plane->state), GFP_KERNEL);
+}
+EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
+
+struct drm_plane_state *
+drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane)
+{
+	return kmemdup(plane->state, sizeof(*plane->state), GFP_KERNEL);
+}
+EXPORT_SYMBOL(drm_atomic_helper_plane_duplicate_state);
+
+void drm_atomic_helper_plane_destroy_state(struct drm_plane *plane,
+					  struct drm_plane_state *state)
+{
+	kfree(state);
+}
+EXPORT_SYMBOL(drm_atomic_helper_plane_destroy_state);
+
+void drm_atomic_helper_connector_reset(struct drm_connector *connector)
+{
+	kfree(connector->state);
+	connector->state = kzalloc(sizeof(*connector->state), GFP_KERNEL);
+}
+EXPORT_SYMBOL(drm_atomic_helper_connector_reset);
+
+struct drm_connector_state *
+drm_atomic_helper_connector_duplicate_state(struct drm_connector *connector)
+{
+	return kmemdup(connector->state, sizeof(*connector->state), GFP_KERNEL);
+}
+EXPORT_SYMBOL(drm_atomic_helper_connector_duplicate_state);
+
+void drm_atomic_helper_connector_destroy_state(struct drm_connector *connector,
+					  struct drm_connector_state *state)
+{
+	kfree(state);
+}
+EXPORT_SYMBOL(drm_atomic_helper_connector_destroy_state);
