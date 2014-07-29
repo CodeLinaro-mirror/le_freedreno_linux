@@ -237,6 +237,9 @@ struct drm_atomic_state;
 struct drm_crtc_state {
 	bool enable        : 1;
 
+	/* computed state bits used by helpers and drivers */
+	bool planes_changed : 1;
+
 	struct drm_display_mode mode;
 
 	struct drm_pending_vblank_event *event;
@@ -757,6 +760,8 @@ struct drm_plane {
 	struct drm_object_properties properties;
 
 	enum drm_plane_type type;
+
+	void *helper_private;
 
 	struct drm_plane_state *state;
 };
