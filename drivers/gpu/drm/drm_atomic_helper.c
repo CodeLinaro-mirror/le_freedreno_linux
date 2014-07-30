@@ -31,6 +31,27 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic_helper.h>
 
+/**
+ * DOC: overview
+ *
+ * This helper library provides implementations of check and commit functions on
+ * top of the CRTC modeset helper callbacks and the plane helper callbacks. It
+ * also provides convenience implementations for the atomic state handling
+ * callbacks for drivers which don't need to subclass the drm core structures to
+ * add their own additional internal state.
+ *
+ * This library also provides default implementations for the check callback in
+ * drm_atomic_helper_check and for the commit callback with
+ * drm_atomic_helper_commit. But the individual stages and callbacks are expose
+ * to allow drivers to mix and match and e.g. use the plane helpers only
+ * together with a driver private modeset implementation.
+ *
+ * This library also provides implementations for all the legacy driver
+ * interfaces on top of the atomic interface. See drm_atomic_helper_set_config,
+ * drm_atomic_helper_disable_plane, drm_atomic_helper_disable_plane and the
+ * various functions to implement set_property callbacks. New drivers must not
+ * implement these functions themselves but must use the provided helpers.
+ */
 static void
 drm_atomic_helper_plane_changed(struct drm_atomic_state *state,
 				struct drm_plane_state *plane_state,
