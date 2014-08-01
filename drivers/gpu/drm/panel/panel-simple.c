@@ -291,6 +291,29 @@ static const struct panel_desc auo_b101aw03 = {
 	},
 };
 
+static const struct drm_display_mode auo_b101xtn01_mode = {
+	.clock = 72000,
+	.hdisplay = 1366,
+	.hsync_start = 1366 + 20,
+	.hsync_end = 1366 + 20 + 70,
+	.htotal = 1366 + 20 + 70,
+	.vdisplay = 768,
+	.vsync_start = 768 + 14,
+	.vsync_end = 768 + 14 + 42,
+	.vtotal = 768 + 14 + 42,
+	.vrefresh = 60,
+	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+};
+
+static const struct panel_desc auo_b101xtn01 = {
+	.modes = &auo_b101xtn01_mode,
+	.num_modes = 1,
+	.size = {
+		.width = 223,
+		.height = 125,
+	},
+};
+
 static const struct drm_display_mode auo_b133xtn01_mode = {
 	.clock = 69500,
 	.hdisplay = 1366,
@@ -451,6 +474,9 @@ static const struct of_device_id platform_of_match[] = {
 	{
 		.compatible = "auo,b101aw03",
 		.data = &auo_b101aw03,
+	}, {
+		.compatible = "auo,b101xtn01",
+		.data = &auo_b101xtn01,
 	}, {
 		.compatible = "auo,b133xtn01",
 		.data = &auo_b133xtn01,
