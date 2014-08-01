@@ -563,8 +563,6 @@ struct drm_crtc *mdp5_crtc_init(struct drm_device *dev,
 	drm_crtc_init_with_planes(dev, crtc, plane, NULL, &mdp5_crtc_funcs);
 	drm_crtc_helper_add(crtc, &mdp5_crtc_helper_funcs);
 
-	mdp5_plane_install_properties(mdp5_crtc->plane, &crtc->base);
-
 	return crtc;
 
 fail:

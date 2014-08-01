@@ -192,8 +192,6 @@ uint32_t mdp4_get_formats(enum mdp4_pipe pipe_id, uint32_t *pixel_formats,
 	return mdp_get_formats(pixel_formats, max_formats);
 }
 
-void mdp4_plane_install_properties(struct drm_plane *plane,
-		struct drm_mode_object *obj);
 void mdp4_plane_set_scanout(struct drm_plane *plane,
 		struct drm_framebuffer *fb);
 int mdp4_plane_mode_set(struct drm_plane *plane,

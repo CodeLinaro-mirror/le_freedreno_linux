@@ -95,13 +95,6 @@ static void mdp5_plane_destroy(struct drm_plane *plane)
 	kfree(mdp5_plane);
 }
 
-/* helper to install properties which are common to planes and crtcs */
-void mdp5_plane_install_properties(struct drm_plane *plane,
-		struct drm_mode_object *obj)
-{
-	// XXX
-}
-
 int mdp5_plane_set_property(struct drm_plane *plane,
 		struct drm_property *property, uint64_t val)
 {
@@ -381,8 +374,6 @@ struct drm_plane *mdp5_plane_init(struct drm_device *dev,
 	drm_universal_plane_init(dev, plane, 0xff, &mdp5_plane_funcs,
 				 mdp5_plane->formats, mdp5_plane->nformats,
 				 type);
-
-	mdp5_plane_install_properties(plane, &plane->base);
 
 	return plane;
 

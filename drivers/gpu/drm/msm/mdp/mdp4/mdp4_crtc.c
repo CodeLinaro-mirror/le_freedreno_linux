@@ -797,8 +797,6 @@ struct drm_crtc *mdp4_crtc_init(struct drm_device *dev,
 	drm_crtc_init_with_planes(dev, crtc, plane, NULL, &mdp4_crtc_funcs);
 	drm_crtc_helper_add(crtc, &mdp4_crtc_helper_funcs);
 
-	mdp4_plane_install_properties(mdp4_crtc->plane, &crtc->base);
-
 	return crtc;
 
 fail:
