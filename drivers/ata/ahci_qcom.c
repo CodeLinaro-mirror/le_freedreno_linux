@@ -56,8 +56,7 @@ static int qcom_ahci_probe(struct platform_device *pdev)
 	if (rc)
 		return rc;
 
-	rc = ahci_platform_init_host(pdev, hpriv, &qcom_ahci_port_info,
-				     0, 0, 0);
+	rc = ahci_platform_init_host(pdev, hpriv, &qcom_ahci_port_info);
 	if (rc)
 		goto disable_resources;
 
