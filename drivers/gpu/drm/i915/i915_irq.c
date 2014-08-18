@@ -151,7 +151,7 @@ ironlake_disable_display_irq(struct drm_i915_private *dev_priv, u32 mask)
 {
 	assert_spin_locked(&dev_priv->irq_lock);
 
-	if (!intel_irqs_enabled(dev_priv))
+	if (WARN_ON(!intel_irqs_enabled(dev_priv)))
 		return;
 
 	if ((dev_priv->irq_mask & mask) != mask) {
@@ -1327,10 +1327,10 @@ static u32 vlv_c0_residency(struct drm_i915_private *dev_priv,
  * @dev_priv: DRM device private
  *
  */
-static u32 vlv_calc_delay_from_C0_counters(struct drm_i915_private *dev_priv)
+static int vlv_calc_delay_from_C0_counters(struct drm_i915_private *dev_priv)
 {
 	u32 residency_C0_up = 0, residency_C0_down = 0;
-	u8 new_delay, adj;
+	int new_delay, adj;
 
 	dev_priv->rps.ei_interrupt_count++;
 
@@ -1647,6 +1647,8 @@ static irqreturn_t gen8_gt_irq_handler(struct drm_device *dev,
 				notify_ring(dev, &dev_priv->ring[RCS]);
 			if (bcs & GT_RENDER_USER_INTERRUPT)
 				notify_ring(dev, &dev_priv->ring[BCS]);
+			if ((rcs | bcs) & GT_CONTEXT_SWITCH_INTERRUPT)
+				DRM_DEBUG_DRIVER("TODO: Context switch\n");
 		} else
 			DRM_ERROR("The master control interrupt lied (GT0)!\n");
 	}
@@ -1659,9 +1661,13 @@ static irqreturn_t gen8_gt_irq_handler(struct drm_device *dev,
 			vcs = tmp >> GEN8_VCS1_IRQ_SHIFT;
 			if (vcs & GT_RENDER_USER_INTERRUPT)
 				notify_ring(dev, &dev_priv->ring[VCS]);
+			if (vcs & GT_CONTEXT_SWITCH_INTERRUPT)
+				DRM_DEBUG_DRIVER("TODO: Context switch\n");
 			vcs = tmp >> GEN8_VCS2_IRQ_SHIFT;
 			if (vcs & GT_RENDER_USER_INTERRUPT)
 				notify_ring(dev, &dev_priv->ring[VCS2]);
+			if (vcs & GT_CONTEXT_SWITCH_INTERRUPT)
+				DRM_DEBUG_DRIVER("TODO: Context switch\n");
 		} else
 			DRM_ERROR("The master control interrupt lied (GT1)!\n");
 	}
@@ -1685,6 +1691,8 @@ static irqreturn_t gen8_gt_irq_handler(struct drm_device *dev,
 			vcs = tmp >> GEN8_VECS_IRQ_SHIFT;
 			if (vcs & GT_RENDER_USER_INTERRUPT)
 				notify_ring(dev, &dev_priv->ring[VECS]);
+			if (vcs & GT_CONTEXT_SWITCH_INTERRUPT)
+				DRM_DEBUG_DRIVER("TODO: Context switch\n");
 		} else
 			DRM_ERROR("The master control interrupt lied (GT3)!\n");
 	}
@@ -1777,7 +1785,9 @@ static inline void intel_hpd_irq_handler(struct drm_device *dev,
 				long_hpd = (dig_hotplug_reg >> dig_shift) & PORTB_HOTPLUG_LONG_DETECT;
 			}
 
-			DRM_DEBUG_DRIVER("digital hpd port %d %d\n", port, long_hpd);
+			DRM_DEBUG_DRIVER("digital hpd port %c - %s\n",
+					 port_name(port),
+					 long_hpd ? "long" : "short");
 			/* for long HPD pulses we want to have the digital queue happen,
 			   but we still want HPD storm detection to function. */
 			if (long_hpd) {
@@ -1989,13 +1999,8 @@ static void gen6_rps_irq_handler(struct drm_i915_private *dev_priv, u32 pm_iir)
 
 static bool intel_pipe_handle_vblank(struct drm_device *dev, enum pipe pipe)
 {
-	struct intel_crtc *crtc;
-
 	if (!drm_handle_vblank(dev, pipe))
 		return false;
-
-	crtc = to_intel_crtc(intel_get_crtc_for_pipe(dev, pipe));
-	wake_up(&crtc->vbl_wait);
 
 	return true;
 }
@@ -3527,18 +3532,17 @@ static void cherryview_irq_preinstall(struct drm_device *dev)
 static void ibx_hpd_irq_setup(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct drm_mode_config *mode_config = &dev->mode_config;
 	struct intel_encoder *intel_encoder;
 	u32 hotplug_irqs, hotplug, enabled_irqs = 0;
 
 	if (HAS_PCH_IBX(dev)) {
 		hotplug_irqs = SDE_HOTPLUG_MASK;
-		list_for_each_entry(intel_encoder, &mode_config->encoder_list, base.head)
+		for_each_intel_encoder(dev, intel_encoder)
 			if (dev_priv->hpd_stats[intel_encoder->hpd_pin].hpd_mark == HPD_ENABLED)
 				enabled_irqs |= hpd_ibx[intel_encoder->hpd_pin];
 	} else {
 		hotplug_irqs = SDE_HOTPLUG_MASK_CPT;
-		list_for_each_entry(intel_encoder, &mode_config->encoder_list, base.head)
+		for_each_intel_encoder(dev, intel_encoder)
 			if (dev_priv->hpd_stats[intel_encoder->hpd_pin].hpd_mark == HPD_ENABLED)
 				enabled_irqs |= hpd_cpt[intel_encoder->hpd_pin];
 	}
@@ -3792,12 +3796,17 @@ static void gen8_gt_irq_postinstall(struct drm_i915_private *dev_priv)
 	/* These are interrupts we'll toggle with the ring mask register */
 	uint32_t gt_interrupts[] = {
 		GT_RENDER_USER_INTERRUPT << GEN8_RCS_IRQ_SHIFT |
+			GT_CONTEXT_SWITCH_INTERRUPT << GEN8_RCS_IRQ_SHIFT |
 			GT_RENDER_L3_PARITY_ERROR_INTERRUPT |
-			GT_RENDER_USER_INTERRUPT << GEN8_BCS_IRQ_SHIFT,
+			GT_RENDER_USER_INTERRUPT << GEN8_BCS_IRQ_SHIFT |
+			GT_CONTEXT_SWITCH_INTERRUPT << GEN8_BCS_IRQ_SHIFT,
 		GT_RENDER_USER_INTERRUPT << GEN8_VCS1_IRQ_SHIFT |
-			GT_RENDER_USER_INTERRUPT << GEN8_VCS2_IRQ_SHIFT,
+			GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VCS1_IRQ_SHIFT |
+			GT_RENDER_USER_INTERRUPT << GEN8_VCS2_IRQ_SHIFT |
+			GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VCS2_IRQ_SHIFT,
 		0,
-		GT_RENDER_USER_INTERRUPT << GEN8_VECS_IRQ_SHIFT
+		GT_RENDER_USER_INTERRUPT << GEN8_VECS_IRQ_SHIFT |
+			GT_CONTEXT_SWITCH_INTERRUPT << GEN8_VECS_IRQ_SHIFT
 		};
 
 	for (i = 0; i < ARRAY_SIZE(gt_interrupts); i++)
@@ -4457,7 +4466,6 @@ static int i965_irq_postinstall(struct drm_device *dev)
 static void i915_hpd_irq_setup(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct drm_mode_config *mode_config = &dev->mode_config;
 	struct intel_encoder *intel_encoder;
 	u32 hotplug_en;
 
@@ -4468,7 +4476,7 @@ static void i915_hpd_irq_setup(struct drm_device *dev)
 		hotplug_en &= ~HOTPLUG_INT_EN_MASK;
 		/* Note HDMI and DP share hotplug bits */
 		/* enable bits are the same for all generations */
-		list_for_each_entry(intel_encoder, &mode_config->encoder_list, base.head)
+		for_each_intel_encoder(dev, intel_encoder)
 			if (dev_priv->hpd_stats[intel_encoder->hpd_pin].hpd_mark == HPD_ENABLED)
 				hotplug_en |= hpd_mask_i915[intel_encoder->hpd_pin];
 		/* Programming the CRT detection parameters tends
@@ -4688,6 +4696,14 @@ void intel_irq_init(struct drm_device *dev)
 		dev->driver->get_vblank_counter = i915_get_vblank_counter;
 		dev->max_vblank_count = 0xffffff; /* only 24 bits of frame count */
 	}
+
+	/*
+	 * Opt out of the vblank disable timer on everything except gen2.
+	 * Gen2 doesn't have a hardware frame counter and so depends on
+	 * vblank interrupts to produce sane vblank seuquence numbers.
+	 */
+	if (!IS_GEN2(dev))
+		dev->vblank_disable_immediate = true;
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		dev->driver->get_vblank_timestamp = i915_get_vblank_timestamp;

@@ -218,16 +218,41 @@ struct drm_property {
 	struct list_head enum_blob_list;
 };
 
-void drm_modeset_lock_all(struct drm_device *dev);
-void drm_modeset_unlock_all(struct drm_device *dev);
-void drm_warn_on_modeset_not_all_locked(struct drm_device *dev);
-
 struct drm_crtc;
 struct drm_connector;
 struct drm_encoder;
 struct drm_pending_vblank_event;
 struct drm_plane;
 struct drm_bridge;
+struct drm_atomic_state;
+
+/**
+ * drm_crtc_state - mutable crtc state
+ * @mode_valid: a valid mode has been set
+ * @set_config: needs modeset (crtc->set_config())
+ * @connectors_change: the connector-ids array has changed
+ * @mode: current mode timings
+ * @event: pending pageflip event
+ */
+struct drm_crtc_state {
+	bool enable        : 1;
+
+	/* computed state bits used by helpers and drivers */
+	bool planes_changed : 1;
+	bool mode_changed : 1;
+
+	/* last_vblank_count: for vblank waits before cleanup */
+	u32 last_vblank_count;
+
+	/* adjusted_mode: for use by helpers and drivers */
+	struct drm_display_mode adjusted_mode;
+
+	struct drm_display_mode mode;
+
+	struct drm_pending_vblank_event *event;
+
+	struct drm_atomic_state *state;
+};
 
 /**
  * drm_crtc_funcs - control CRTCs for a given device
@@ -291,6 +316,15 @@ struct drm_crtc_funcs {
 
 	int (*set_property)(struct drm_crtc *crtc,
 			    struct drm_property *property, uint64_t val);
+
+	/* atomic update handling */
+	struct drm_crtc_state *(*atomic_duplicate_state)(struct drm_crtc *crtc);
+	void (*atomic_destroy_state)(struct drm_crtc *crtc,
+				     struct drm_crtc_state *cstate);
+	int (*atomic_set_property)(struct drm_crtc *crtc,
+				   struct drm_crtc_state *state,
+				   struct drm_property *property,
+				   uint64_t val);
 };
 
 /**
@@ -345,10 +379,6 @@ struct drm_crtc {
 	int cursor_x;
 	int cursor_y;
 
-	/* Temporary tracking of the old fb while a modeset is ongoing. Used
-	 * by drm_mode_set_config_internal to implement correct refcounting. */
-	struct drm_framebuffer *old_fb;
-
 	bool enabled;
 
 	/* Requested mode from modesetting. */
@@ -375,8 +405,47 @@ struct drm_crtc {
 	void *helper_private;
 
 	struct drm_object_properties properties;
+
+	struct drm_crtc_state *state;
+
+	/*
+	 * For legacy crtc ioctls so that atomic drivers can get at the locking
+	 * acquire context.
+	 */
+	struct drm_modeset_acquire_ctx *acquire_ctx;
 };
 
+static inline struct drm_crtc_state *
+drm_crtc_duplicate_state(struct drm_crtc *crtc)
+{
+	if (crtc->funcs->atomic_duplicate_state)
+		return crtc->funcs->atomic_duplicate_state(crtc);
+	return kmemdup(crtc->state, sizeof(struct drm_crtc_state), GFP_KERNEL);
+}
+
+static inline void
+drm_crtc_destroy_state(struct drm_crtc *crtc,
+		       struct drm_crtc_state *cstate)
+{
+	if (crtc->funcs->atomic_destroy_state)
+		crtc->funcs->atomic_destroy_state(crtc, cstate);
+	else
+		kfree(cstate);
+}
+
+
+/**
+ * drm_connector_state - mutable connector state
+ * @crtc: crtc to connect connector to, NULL if disabled
+ */
+struct drm_connector_state {
+	struct drm_crtc *crtc;
+
+	/* best_encoder: for use by helpers and drivers */
+	struct drm_encoder *best_encoder;
+
+	struct drm_atomic_state *state;
+};
 
 /**
  * drm_connector_funcs - control connectors on a given device
@@ -413,6 +482,15 @@ struct drm_connector_funcs {
 			     uint64_t val);
 	void (*destroy)(struct drm_connector *connector);
 	void (*force)(struct drm_connector *connector);
+
+	/* atomic update handling */
+	struct drm_connector_state *(*atomic_duplicate_state)(struct drm_connector *connector);
+	void (*atomic_destroy_state)(struct drm_connector *connector,
+				     struct drm_connector_state *cstate);
+	int (*atomic_set_property)(struct drm_connector *connector,
+				   struct drm_connector_state *state,
+				   struct drm_property *property,
+				   uint64_t val);
 };
 
 /**
@@ -548,6 +626,7 @@ struct drm_connector {
 	void *helper_private;
 
 	/* forced on connector */
+	struct drm_cmdline_mode cmdline_mode;
 	enum drm_connector_force force;
 	bool override_edid;
 	uint32_t encoder_ids[DRM_CONNECTOR_MAX_ENCODER];
@@ -564,7 +643,59 @@ struct drm_connector {
 	unsigned bad_edid_counter;
 
 	struct dentry *debugfs_entry;
+
+	struct drm_connector_state *state;
 };
+
+static inline struct drm_connector_state *
+drm_connector_duplicate_state(struct drm_connector *connector)
+{
+	if (connector->funcs->atomic_duplicate_state)
+		return connector->funcs->atomic_duplicate_state(connector);
+	return kmemdup(connector->state,
+		       sizeof(struct drm_connector_state), GFP_KERNEL);
+}
+
+static inline void
+drm_connector_destroy_state(struct drm_connector *connector,
+			    struct drm_connector_state *cstate)
+{
+	if (connector->funcs->atomic_destroy_state)
+		connector->funcs->atomic_destroy_state(connector, cstate);
+	else
+		kfree(cstate);
+}
+
+/**
+ * drm_plane_state - mutable plane state
+ * @crtc: currently bound CRTC
+ * @fb: currently bound fb
+ * @crtc_x: left position of visible portion of plane on crtc
+ * @crtc_y: upper position of visible portion of plane on crtc
+ * @crtc_w: width of visible portion of plane on crtc
+ * @crtc_h: height of visible portion of plane on crtc
+ * @src_x: left position of visible portion of plane within
+ *	plane (in 16.16)
+ * @src_y: upper position of visible portion of plane within
+ *	plane (in 16.16)
+ * @src_w: width of visible portion of plane (in 16.16)
+ * @src_h: height of visible portion of plane (in 16.16)
+ */
+struct drm_plane_state {
+	struct drm_crtc *crtc;
+	struct drm_framebuffer *fb;
+
+	/* Signed dest location allows it to be partially off screen */
+	int32_t crtc_x, crtc_y;
+	uint32_t crtc_w, crtc_h;
+
+	/* Source values are 16.16 fixed point */
+	uint32_t src_x, src_y;
+	uint32_t src_h, src_w;
+
+	struct drm_atomic_state *state;
+};
+
 
 /**
  * drm_plane_funcs - driver plane control functions
@@ -582,9 +713,19 @@ struct drm_plane_funcs {
 			    uint32_t src_w, uint32_t src_h);
 	int (*disable_plane)(struct drm_plane *plane);
 	void (*destroy)(struct drm_plane *plane);
+	void (*reset)(struct drm_plane *plane);
 
 	int (*set_property)(struct drm_plane *plane,
 			    struct drm_property *property, uint64_t val);
+
+	/* atomic update handling */
+	struct drm_plane_state *(*atomic_duplicate_state)(struct drm_plane *plane);
+	void (*atomic_destroy_state)(struct drm_plane *plane,
+				     struct drm_plane_state *cstate);
+	int (*atomic_set_property)(struct drm_plane *plane,
+				   struct drm_plane_state *state,
+				   struct drm_property *property,
+				   uint64_t val);
 };
 
 enum drm_plane_type {
@@ -620,12 +761,39 @@ struct drm_plane {
 	struct drm_crtc *crtc;
 	struct drm_framebuffer *fb;
 
+	/* Temporary tracking of the old fb while a modeset is ongoing. Used
+	 * by drm_mode_set_config_internal to implement correct refcounting. */
+	struct drm_framebuffer *old_fb;
+
 	const struct drm_plane_funcs *funcs;
 
 	struct drm_object_properties properties;
 
 	enum drm_plane_type type;
+
+	void *helper_private;
+
+	struct drm_plane_state *state;
 };
+
+static inline struct drm_plane_state *
+drm_plane_duplicate_state(struct drm_plane *plane)
+{
+	if (plane->funcs->atomic_duplicate_state)
+		return plane->funcs->atomic_duplicate_state(plane);
+	return kmemdup(plane->state, sizeof(struct drm_plane_state), GFP_KERNEL);
+}
+
+static inline void
+drm_plane_destroy_state(struct drm_plane *plane,
+			struct drm_plane_state *cstate)
+{
+	if (plane->funcs->atomic_destroy_state)
+		plane->funcs->atomic_destroy_state(plane, cstate);
+	else
+		kfree(cstate);
+}
+
 
 /**
  * drm_bridge_funcs - drm_bridge control functions
@@ -670,6 +838,23 @@ struct drm_bridge {
 };
 
 /**
+ * struct drm_atomic_state - the global state object for atomic updates
+ */
+struct drm_atomic_state {
+       struct drm_device *dev;
+       uint32_t flags;
+       struct drm_plane **planes;
+       struct drm_plane_state **plane_states;
+       struct drm_crtc **crtcs;
+       struct drm_crtc_state **crtc_states;
+       struct drm_connector **connectors;
+       struct drm_connector_state **connector_states;
+
+       struct drm_modeset_acquire_ctx *acquire_ctx;
+};
+
+
+/**
  * drm_mode_set - new values for a CRTC config change
  * @head: list management
  * @fb: framebuffer to use for new config
@@ -710,6 +895,12 @@ struct drm_mode_config_funcs {
 					     struct drm_file *file_priv,
 					     struct drm_mode_fb_cmd2 *mode_cmd);
 	void (*output_poll_changed)(struct drm_device *dev);
+
+	int (*atomic_check)(struct drm_device *dev,
+			    struct drm_atomic_state *a);
+	int (*atomic_commit)(struct drm_device *dev,
+			     struct drm_atomic_state *a,
+			     bool async);
 };
 
 /**
@@ -821,6 +1012,7 @@ struct drm_mode_config {
 	struct drm_property *dpms_property;
 	struct drm_property *path_property;
 	struct drm_property *plane_type_property;
+	struct drm_property *rotation_property;
 
 	/* DVI-I properties */
 	struct drm_property *dvi_i_subconnector_property;
@@ -903,6 +1095,7 @@ int drm_connector_register(struct drm_connector *connector);
 void drm_connector_unregister(struct drm_connector *connector);
 
 extern void drm_connector_cleanup(struct drm_connector *connector);
+extern unsigned int drm_connector_index(struct drm_connector *connector);
 /* helper to unplug all connectors from sysfs for device */
 extern void drm_connector_unplug_all(struct drm_device *dev);
 
@@ -942,6 +1135,7 @@ extern int drm_plane_init(struct drm_device *dev,
 			  const uint32_t *formats, uint32_t format_count,
 			  bool is_primary);
 extern void drm_plane_cleanup(struct drm_plane *plane);
+extern unsigned int drm_plane_index(struct drm_plane *plane);
 extern void drm_plane_force_disable(struct drm_plane *plane);
 extern int drm_crtc_check_viewport(const struct drm_crtc *crtc,
 				   int x, int y,

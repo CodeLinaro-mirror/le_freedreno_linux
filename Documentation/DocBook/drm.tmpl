@@ -2317,8 +2317,21 @@ void intel_crt_init(struct drm_device *dev)
       </itemizedlist>
     </sect2>
     <sect2>
+      <title>Atomic Modeset Helper Functions Reference</title>
+      <sect3>
+	<title>Overview</title>
+!Pdrivers/gpu/drm/drm_atomic_helper.c overview
+      </sect3>
+      <sect3>
+	<title>Implementing Asynchronous Atomic Commit</title>
+!Pdrivers/gpu/drm/drm_atomic_helper.c implementing async commit
+      </sect3>
+!Edrivers/gpu/drm/drm_atomic_helper.c
+    </sect2>
+    <sect2>
       <title>Modeset Helper Functions Reference</title>
 !Edrivers/gpu/drm/drm_crtc_helper.c
+!Pdrivers/gpu/drm/drm_crtc_helper.c overview
     </sect2>
     <sect2>
       <title>Output Probing Helper Functions Reference</title>
@@ -2372,7 +2385,8 @@ void intel_crt_init(struct drm_device *dev)
     </sect2>
     <sect2>
       <title id="drm-kms-planehelpers">Plane Helper Reference</title>
-!Edrivers/gpu/drm/drm_plane_helper.c Plane Helpers
+!Edrivers/gpu/drm/drm_plane_helper.c
+!Pdrivers/gpu/drm/drm_plane_helper.c overview
     </sect2>
   </sect1>
 
@@ -3386,6 +3400,13 @@ void (*disable_vblank) (struct drm_device *dev, int crtc);</synopsis>
       by scheduling a timer. The delay is accessible through the vblankoffdelay
       module parameter or the <varname>drm_vblank_offdelay</varname> global
       variable and expressed in milliseconds. Its default value is 5000 ms.
+      Zero means never disable, and a negative value means disable immediately.
+      Drivers may override the behaviour by setting the
+      <structname>drm_device</structname>
+      <structfield>vblank_disable_immediate</structfield> flag, which when set
+      causes vblank interrupts to be disabled immediately regardless of the
+      drm_vblank_offdelay value. The flag should only be set if there's a
+      properly working hardware vblank counter present.
     </para>
     <para>
       When a vertical blanking interrupt occurs drivers only need to call the
@@ -3400,6 +3421,7 @@ void (*disable_vblank) (struct drm_device *dev, int crtc);</synopsis>
     <sect2>
       <title>Vertical Blanking and Interrupt Handling Functions Reference</title>
 !Edrivers/gpu/drm/drm_irq.c
+!Iinclude/drm/drmP.h drm_crtc_vblank_waitqueue
     </sect2>
   </sect1>
 

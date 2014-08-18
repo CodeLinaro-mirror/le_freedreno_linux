@@ -365,7 +365,7 @@ int exynos_drm_crtc_create(struct exynos_drm_manager *manager)
 	exynos_crtc->manager = manager;
 	exynos_crtc->pipe = manager->pipe;
 	exynos_crtc->plane = exynos_plane_init(manager->drm_dev,
-				1 << manager->pipe, true);
+				1 << manager->pipe, false);
 	if (!exynos_crtc->plane) {
 		kfree(exynos_crtc);
 		return -ENOMEM;
@@ -376,7 +376,9 @@ int exynos_drm_crtc_create(struct exynos_drm_manager *manager)
 
 	private->crtc[manager->pipe] = crtc;
 
-	drm_crtc_init(manager->drm_dev, crtc, &exynos_crtc_funcs);
+	drm_crtc_init_with_planes(manager->drm_dev, crtc,
+				  exynos_crtc->plane, NULL,
+				  &exynos_crtc_funcs);
 	drm_crtc_helper_add(crtc, &exynos_crtc_helper_funcs);
 
 	exynos_drm_crtc_attach_mode_property(crtc);

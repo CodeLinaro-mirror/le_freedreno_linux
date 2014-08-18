@@ -333,7 +333,7 @@ static int per_file_stats(int id, void *ptr, void *data)
 			}
 
 			ppgtt = container_of(vma->vm, struct i915_hw_ppgtt, base);
-			if (ppgtt->ctx && ppgtt->ctx->file_priv != stats->file_priv)
+			if (ppgtt->file_priv != stats->file_priv)
 				continue;
 
 			if (obj->ring) /* XXX per-vma statistic */
@@ -703,6 +703,12 @@ static int i915_interrupt_info(struct seq_file *m, void *data)
 		}
 
 		for_each_pipe(pipe) {
+			if (!intel_display_power_enabled(dev_priv,
+						POWER_DOMAIN_PIPE(pipe))) {
+				seq_printf(m, "Pipe %c power disabled\n",
+					   pipe_name(pipe));
+				continue;
+			}
 			seq_printf(m, "Pipe %c IMR:\t%08x\n",
 				   pipe_name(pipe),
 				   I915_READ(GEN8_DE_PIPE_IMR(pipe)));
@@ -1433,6 +1439,47 @@ static int i915_fbc_status(struct seq_file *m, void *unused)
 	return 0;
 }
 
+static int i915_fbc_fc_get(void *data, u64 *val)
+{
+	struct drm_device *dev = data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	if (INTEL_INFO(dev)->gen < 7 || !HAS_FBC(dev))
+		return -ENODEV;
+
+	drm_modeset_lock_all(dev);
+	*val = dev_priv->fbc.false_color;
+	drm_modeset_unlock_all(dev);
+
+	return 0;
+}
+
+static int i915_fbc_fc_set(void *data, u64 val)
+{
+	struct drm_device *dev = data;
+	struct drm_i915_private *dev_priv = dev->dev_private;
+	u32 reg;
+
+	if (INTEL_INFO(dev)->gen < 7 || !HAS_FBC(dev))
+		return -ENODEV;
+
+	drm_modeset_lock_all(dev);
+
+	reg = I915_READ(ILK_DPFC_CONTROL);
+	dev_priv->fbc.false_color = val;
+
+	I915_WRITE(ILK_DPFC_CONTROL, val ?
+		   (reg | FBC_CTL_FALSE_COLOR) :
+		   (reg & ~FBC_CTL_FALSE_COLOR));
+
+	drm_modeset_unlock_all(dev);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(i915_fbc_fc_fops,
+			i915_fbc_fc_get, i915_fbc_fc_set,
+			"%llu\n");
+
 static int i915_ips_status(struct seq_file *m, void *unused)
 {
 	struct drm_info_node *node = m->private;
@@ -1774,7 +1821,13 @@ static int per_file_ctx(int id, void *ptr, void *data)
 {
 	struct intel_context *ctx = ptr;
 	struct seq_file *m = data;
-	struct i915_hw_ppgtt *ppgtt = ctx_to_ppgtt(ctx);
+	struct i915_hw_ppgtt *ppgtt = ctx->ppgtt;
+
+	if (!ppgtt) {
+		seq_printf(m, "  no ppgtt for context %d\n",
+			   ctx->user_handle);
+		return 0;
+	}
 
 	if (i915_gem_context_is_default(ctx))
 		seq_puts(m, "  default context:\n");
@@ -1834,8 +1887,7 @@ static void gen6_ppgtt_info(struct seq_file *m, struct drm_device *dev)
 		seq_printf(m, "pd gtt offset: 0x%08x\n", ppgtt->pd_offset);
 
 		ppgtt->debug_dump(ppgtt, m);
-	} else
-		return;
+	}
 
 	list_for_each_entry_reverse(file, &dev->filelist, lhead) {
 		struct drm_i915_file_private *file_priv = file->driver_priv;
@@ -2667,8 +2719,7 @@ static int i9xx_pipe_crc_auto_source(struct drm_device *dev, enum pipe pipe,
 	*source = INTEL_PIPE_CRC_SOURCE_PIPE;
 
 	drm_modeset_lock_all(dev);
-	list_for_each_entry(encoder, &dev->mode_config.encoder_list,
-			    base.head) {
+	for_each_intel_encoder(dev, encoder) {
 		if (!encoder->base.crtc)
 			continue;
 
@@ -3957,6 +4008,7 @@ static const struct i915_debugfs_files {
 	{"i915_pri_wm_latency", &i915_pri_wm_latency_fops},
 	{"i915_spr_wm_latency", &i915_spr_wm_latency_fops},
 	{"i915_cur_wm_latency", &i915_cur_wm_latency_fops},
+	{"i915_fbc_false_color", &i915_fbc_fc_fops},
 };
 
 void intel_display_crc_init(struct drm_device *dev)
