@@ -401,6 +401,8 @@ static const struct drm_connector_funcs hdmi_connector_funcs = {
 	.detect = hdmi_connector_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = hdmi_connector_destroy,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
 static const struct drm_connector_helper_funcs hdmi_connector_helper_funcs = {
@@ -430,6 +432,7 @@ struct drm_connector *hdmi_connector_init(struct hdmi *hdmi)
 	drm_connector_init(hdmi->dev, connector, &hdmi_connector_funcs,
 			DRM_MODE_CONNECTOR_HDMIA);
 	drm_connector_helper_add(connector, &hdmi_connector_helper_funcs);
+	drm_atomic_helper_connector_reset(connector);
 
 	connector->polled = DRM_CONNECTOR_POLL_CONNECT |
 			DRM_CONNECTOR_POLL_DISCONNECT;

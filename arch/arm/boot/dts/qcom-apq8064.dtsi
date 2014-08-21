@@ -601,7 +601,7 @@
 			interrupts = <GIC_SPI 75 0>;
 			connectors = <&hdmi>;
 			gpus = <&gpu>;
-			qcom,lvds-panel = <&panel>;
+//			qcom,lvds-panel = <&panel>;
 			clock-names =
 			    "core_clk",
 			    "iface_clk",

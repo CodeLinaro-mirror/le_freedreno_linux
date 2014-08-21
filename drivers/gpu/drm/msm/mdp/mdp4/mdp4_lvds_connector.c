@@ -128,6 +128,7 @@ struct drm_connector *mdp4_lvds_connector_init(struct drm_device *dev,
 	drm_connector_init(dev, connector, &mdp4_lvds_connector_funcs,
 			DRM_MODE_CONNECTOR_LVDS);
 	drm_connector_helper_add(connector, &mdp4_lvds_connector_helper_funcs);
+	drm_atomic_helper_connector_reset(connector);
 
 	connector->polled = 0;
 

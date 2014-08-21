@@ -37,27 +37,6 @@ static struct mdp4_kms *get_kms(struct drm_plane *plane)
 	return to_mdp4_kms(to_mdp_kms(priv->kms));
 }
 
-static int mdp4_plane_update(struct drm_plane *plane,
-		struct drm_crtc *crtc, struct drm_framebuffer *fb,
-		int crtc_x, int crtc_y,
-		unsigned int crtc_w, unsigned int crtc_h,
-		uint32_t src_x, uint32_t src_y,
-		uint32_t src_w, uint32_t src_h)
-{
-	struct mdp4_plane *mdp4_plane = to_mdp4_plane(plane);
-
-	mdp4_plane->enabled = true;
-
-	if (plane->fb)
-		drm_framebuffer_unreference(plane->fb);
-
-	drm_framebuffer_reference(fb);
-
-	return mdp4_plane_mode_set(plane, crtc, fb,
-			crtc_x, crtc_y, crtc_w, crtc_h,
-			src_x, src_y, src_w, src_h);
-}
-
 static int mdp4_plane_disable(struct drm_plane *plane)
 {
 	struct mdp4_plane *mdp4_plane = to_mdp4_plane(plane);
@@ -77,18 +56,75 @@ static void mdp4_plane_destroy(struct drm_plane *plane)
 	kfree(mdp4_plane);
 }
 
-int mdp4_plane_set_property(struct drm_plane *plane,
+static int mdp4_plane_set_property(struct drm_plane *plane,
+		struct drm_plane_state *state,
 		struct drm_property *property, uint64_t val)
 {
 	// XXX
 	return -EINVAL;
 }
 
+static int mdp4_plane_prepare_fb(struct drm_plane *plane,
+		struct drm_framebuffer *fb, bool async)
+{
+	/* TODO we should pin/unpin in prepare/cleanup..  but for now
+	 * avoid making too much changes to how the plane code works
+	 * to avoid conflicts with other work that is still out on
+	 * branches.
+	 */
+	return 0;
+}
+static void mdp4_plane_cleanup_fb(struct drm_plane *plane,
+		struct drm_framebuffer *fb)
+{
+}
+
+static int mdp4_plane_atomic_check(struct drm_plane *plane,
+		struct drm_plane_state *pstate)
+{
+	return 0;
+}
+
+static void mdp4_plane_atomic_update(struct drm_plane *plane)
+{
+	struct mdp4_plane *mdp4_plane = to_mdp4_plane(plane);
+	struct drm_plane_state *pstate = plane->state;
+
+	mdp4_plane->enabled = pstate->crtc && pstate->fb;
+
+	if (plane->fb)
+		drm_framebuffer_unreference(plane->fb);
+
+	if (pstate->fb)
+		drm_framebuffer_reference(pstate->fb);
+
+	if (!mdp4_plane->enabled) {
+		mdp4_plane_disable(plane);
+	} else {
+		mdp4_plane_mode_set(plane,
+				pstate->crtc, pstate->fb,
+				pstate->crtc_x, pstate->crtc_y,
+				pstate->crtc_w, pstate->crtc_h,
+				pstate->src_x, pstate->src_y,
+				pstate->src_w, pstate->src_h);
+	}
+}
+
 static const struct drm_plane_funcs mdp4_plane_funcs = {
-		.update_plane = mdp4_plane_update,
-		.disable_plane = mdp4_plane_disable,
+		.update_plane = drm_atomic_helper_update_plane,
+		.disable_plane = drm_atomic_helper_disable_plane,
 		.destroy = mdp4_plane_destroy,
-		.set_property = mdp4_plane_set_property,
+		.set_property = drm_atomic_helper_plane_set_property,
+		.atomic_set_property = mdp4_plane_set_property,
+		.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+		.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+};
+
+static const struct drm_plane_helper_funcs mdp4_plane_helper_funcs = {
+		.prepare_fb = mdp4_plane_prepare_fb,
+		.cleanup_fb = mdp4_plane_cleanup_fb,
+		.atomic_check = mdp4_plane_atomic_check,
+		.atomic_update = mdp4_plane_atomic_update,
 };
 
 void mdp4_plane_set_scanout(struct drm_plane *plane,
@@ -190,8 +226,11 @@ int mdp4_plane_mode_set(struct drm_plane *plane,
 	mdp4_write(mdp4_kms, REG_MDP4_PIPE_PHASEX_STEP(pipe), phasex_step);
 	mdp4_write(mdp4_kms, REG_MDP4_PIPE_PHASEY_STEP(pipe), phasey_step);
 
-	/* TODO detach from old crtc (if we had more than one) */
-	mdp4_crtc_attach(crtc, plane);
+	if (plane->crtc)
+		mdp4_crtc_detach(plane->crtc, plane);
+
+	if (crtc)
+		mdp4_crtc_attach(crtc, plane);
 
 	return 0;
 }
@@ -235,6 +274,8 @@ struct drm_plane *mdp4_plane_init(struct drm_device *dev,
 	drm_universal_plane_init(dev, plane, 0xff, &mdp4_plane_funcs,
 				 mdp4_plane->formats, mdp4_plane->nformats,
 				 type);
+	drm_plane_helper_add(plane, &mdp4_plane_helper_funcs);
+	drm_atomic_helper_plane_reset(plane);
 
 	return plane;
 

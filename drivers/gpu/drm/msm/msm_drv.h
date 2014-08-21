@@ -33,14 +33,6 @@
 #include <asm/sizes.h>
 
 
-#if defined(CONFIG_COMPILE_TEST) && !defined(CONFIG_ARCH_QCOM)
-/* stubs we need for compile-test: */
-static inline struct device *msm_iommu_get_ctx(const char *ctx_name)
-{
-	return NULL;
-}
-#endif
-
 #ifndef CONFIG_OF
 #include <mach/board.h>
 #include <mach/socinfo.h>
@@ -48,7 +40,9 @@ static inline struct device *msm_iommu_get_ctx(const char *ctx_name)
 #endif
 
 #include <drm/drmP.h>
+#include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_plane_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/msm_drm.h>
 
@@ -199,6 +193,9 @@ struct drm_framebuffer *msm_framebuffer_create(struct drm_device *dev,
 		struct drm_file *file, struct drm_mode_fb_cmd2 *mode_cmd);
 
 struct drm_fb_helper *msm_fbdev_init(struct drm_device *dev);
+
+int msm_atomic_check(struct drm_device *dev, struct drm_atomic_state *a);
+int msm_atomic_commit(struct drm_device *dev, struct drm_atomic_state *a, bool async);
 
 struct hdmi;
 struct hdmi *hdmi_init(struct drm_device *dev, struct drm_encoder *encoder);

@@ -446,6 +446,7 @@ static void mdp4_crtc_load_lut(struct drm_crtc *crtc)
 {
 }
 
+#if 0
 static int mdp4_crtc_page_flip(struct drm_crtc *crtc,
 		struct drm_framebuffer *new_fb,
 		struct drm_pending_vblank_event *event,
@@ -471,9 +472,11 @@ static int mdp4_crtc_page_flip(struct drm_crtc *crtc,
 
 	return msm_gem_queue_inactive_cb(obj, &mdp4_crtc->pageflip_cb);
 }
+#endif
 
 static int mdp4_crtc_set_property(struct drm_crtc *crtc,
-		struct drm_property *property, uint64_t val)
+		struct drm_crtc_state *state, struct drm_property *property,
+		uint64_t val)
 {
 	// XXX
 	return -EINVAL;
@@ -606,13 +609,30 @@ static int mdp4_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
 	return 0;
 }
 
+static int mdp4_crtc_atomic_check(struct drm_crtc *crtc,
+		struct drm_crtc_state *cstate)
+{
+	return 0;
+}
+
+static void mdp4_crtc_atomic_begin(struct drm_crtc *crtc)
+{
+}
+
+static void mdp4_crtc_atomic_flush(struct drm_crtc *crtc)
+{
+}
+
 static const struct drm_crtc_funcs mdp4_crtc_funcs = {
-	.set_config = drm_crtc_helper_set_config,
+	.set_config = drm_atomic_helper_set_config,
 	.destroy = mdp4_crtc_destroy,
-	.page_flip = mdp4_crtc_page_flip,
-	.set_property = mdp4_crtc_set_property,
+	.page_flip = drm_atomic_helper_page_flip,
+	.set_property = drm_atomic_helper_crtc_set_property,
 	.cursor_set = mdp4_crtc_cursor_set,
 	.cursor_move = mdp4_crtc_cursor_move,
+	.atomic_set_property = mdp4_crtc_set_property,
+	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
 };
 
 static const struct drm_crtc_helper_funcs mdp4_crtc_helper_funcs = {
@@ -623,6 +643,9 @@ static const struct drm_crtc_helper_funcs mdp4_crtc_helper_funcs = {
 	.commit = mdp4_crtc_commit,
 	.mode_set_base = mdp4_crtc_mode_set_base,
 	.load_lut = mdp4_crtc_load_lut,
+	.atomic_check = mdp4_crtc_atomic_check,
+	.atomic_begin = mdp4_crtc_atomic_begin,
+	.atomic_flush = mdp4_crtc_atomic_flush,
 };
 
 static void mdp4_crtc_vblank_irq(struct mdp_irq *irq, uint32_t irqstatus)
@@ -796,6 +819,7 @@ struct drm_crtc *mdp4_crtc_init(struct drm_device *dev,
 
 	drm_crtc_init_with_planes(dev, crtc, plane, NULL, &mdp4_crtc_funcs);
 	drm_crtc_helper_add(crtc, &mdp4_crtc_helper_funcs);
+	drm_atomic_helper_crtc_reset(crtc);
 
 	return crtc;
 
