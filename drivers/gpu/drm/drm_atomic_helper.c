@@ -450,6 +450,10 @@ disable_outputs(struct drm_device *dev, struct drm_atomic_state *old_state)
 			continue;
 
 		encoder = connector->state->best_encoder;
+
+		if (!encoder)
+			continue;
+
 		funcs = encoder->helper_private;
 
 		if (encoder->bridge)
@@ -515,7 +519,8 @@ set_routing_links(struct drm_device *dev, struct drm_atomic_state *old_state)
 
 		connector = old_state->connectors[i];
 
-		if (!connector || !connector->state->crtc)
+		if (!connector || !connector->state->crtc ||
+			!connector->state->best_encoder)
 			continue;
 
 		connector->encoder = connector->state->best_encoder;
@@ -1183,7 +1188,7 @@ static int update_output_state(struct drm_atomic_state *state,
 	struct drm_device *dev = set->crtc->dev;
 	struct drm_connector_state *conn_state;
 	struct drm_crtc_state *crtc_state;
-	struct drm_crtc *crtc;
+	struct drm_crtc *crtc = NULL;
 	int nconnectors = state->dev->mode_config.num_connector;
 	int ncrtcs = state->dev->mode_config.num_crtc;
 	int ret, i, j;
