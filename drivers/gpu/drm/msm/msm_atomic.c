@@ -22,7 +22,7 @@
 
 int msm_atomic_check(struct drm_device *dev, struct drm_atomic_state *a)
 {
-	return 0;
+	return drm_atomic_helper_check(dev, a);
 }
 
 int msm_atomic_commit(struct drm_device *dev, struct drm_atomic_state *a,

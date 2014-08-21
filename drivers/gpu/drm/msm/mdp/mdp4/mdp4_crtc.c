@@ -479,6 +479,8 @@ static int mdp4_crtc_set_property(struct drm_crtc *crtc,
 		uint64_t val)
 {
 	// XXX
+	struct mdp4_crtc *mdp4_crtc = to_mdp4_crtc(crtc);
+	DBG("%s", mdp4_crtc->name);
 	return -EINVAL;
 }
 
@@ -612,15 +614,73 @@ static int mdp4_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
 static int mdp4_crtc_atomic_check(struct drm_crtc *crtc,
 		struct drm_crtc_state *cstate)
 {
+	struct mdp4_crtc *mdp4_crtc = to_mdp4_crtc(crtc);
+	DBG("%s", mdp4_crtc->name);
 	return 0;
 }
 
 static void mdp4_crtc_atomic_begin(struct drm_crtc *crtc)
 {
+	struct mdp4_crtc *mdp4_crtc = to_mdp4_crtc(crtc);
+	DBG("%s", mdp4_crtc->name);
+	mdp4_crtc_prepare(crtc);
+}
+
+static void mdp4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+{
+	// XXX most of _atomic_flush() should be in here, I think..
 }
 
 static void mdp4_crtc_atomic_flush(struct drm_crtc *crtc)
 {
+	struct drm_crtc_state *cstate = crtc->state;
+	struct drm_display_mode *mode = &cstate->mode;
+	struct mdp4_crtc *mdp4_crtc = to_mdp4_crtc(crtc);
+	struct mdp4_kms *mdp4_kms = get_kms(crtc);
+	enum mdp4_dma dma = mdp4_crtc->dma;
+	int ovlp = mdp4_crtc->ovlp;
+
+DBG("crtc=%p, kms=%p", crtc, mdp4_kms);
+if (!crtc->primary || !crtc->primary->fb)
+	return;
+
+	DBG("%s: set mode: %d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x",
+			mdp4_crtc->name, mode->base.id, mode->name,
+			mode->vrefresh, mode->clock,
+			mode->hdisplay, mode->hsync_start,
+			mode->hsync_end, mode->htotal,
+			mode->vdisplay, mode->vsync_start,
+			mode->vsync_end, mode->vtotal,
+			mode->type, mode->flags);
+
+	mdp4_write(mdp4_kms, REG_MDP4_DMA_SRC_SIZE(dma),
+			MDP4_DMA_SRC_SIZE_WIDTH(mode->hdisplay) |
+			MDP4_DMA_SRC_SIZE_HEIGHT(mode->vdisplay));
+
+	/* take data from pipe: */
+	mdp4_write(mdp4_kms, REG_MDP4_DMA_SRC_BASE(dma), 0);
+	mdp4_write(mdp4_kms, REG_MDP4_DMA_SRC_STRIDE(dma),
+			crtc->primary->fb->pitches[0]);
+	mdp4_write(mdp4_kms, REG_MDP4_DMA_DST_SIZE(dma),
+			MDP4_DMA_DST_SIZE_WIDTH(0) |
+			MDP4_DMA_DST_SIZE_HEIGHT(0));
+
+	mdp4_write(mdp4_kms, REG_MDP4_OVLP_BASE(ovlp), 0);
+	mdp4_write(mdp4_kms, REG_MDP4_OVLP_SIZE(ovlp),
+			MDP4_OVLP_SIZE_WIDTH(mode->hdisplay) |
+			MDP4_OVLP_SIZE_HEIGHT(mode->vdisplay));
+	mdp4_write(mdp4_kms, REG_MDP4_OVLP_STRIDE(ovlp),
+			crtc->primary->fb->pitches[0]);
+
+	mdp4_write(mdp4_kms, REG_MDP4_OVLP_CFG(ovlp), 1);
+
+	if (dma == DMA_E) {
+		mdp4_write(mdp4_kms, REG_MDP4_DMA_E_QUANT(0), 0x00ff0000);
+		mdp4_write(mdp4_kms, REG_MDP4_DMA_E_QUANT(1), 0x00ff0000);
+		mdp4_write(mdp4_kms, REG_MDP4_DMA_E_QUANT(2), 0x00ff0000);
+	}
+
+	mdp4_crtc_commit(crtc);
 }
 
 static const struct drm_crtc_funcs mdp4_crtc_funcs = {
@@ -639,9 +699,10 @@ static const struct drm_crtc_helper_funcs mdp4_crtc_helper_funcs = {
 	.dpms = mdp4_crtc_dpms,
 	.mode_fixup = mdp4_crtc_mode_fixup,
 	.mode_set = mdp4_crtc_mode_set,
+	.mode_set_nofb = mdp4_crtc_mode_set_nofb,
+	.mode_set_base = mdp4_crtc_mode_set_base,
 	.prepare = mdp4_crtc_prepare,
 	.commit = mdp4_crtc_commit,
-	.mode_set_base = mdp4_crtc_mode_set_base,
 	.load_lut = mdp4_crtc_load_lut,
 	.atomic_check = mdp4_crtc_atomic_check,
 	.atomic_begin = mdp4_crtc_atomic_begin,
