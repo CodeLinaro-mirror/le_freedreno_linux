@@ -698,10 +698,9 @@ wait_for_vblanks(struct drm_device *dev, struct drm_atomic_state *old_state)
 		if (!crtc || !old_crtc_state->enable)
 			continue;
 
-#define C (old_crtc_state->last_vblank_count != drm_vblank_count(dev, i))
-		wait_event(dev->vblank[drm_crtc_index(crtc)].queue, C);
-
-#undef C
+		ret = wait_event_timeout(dev->vblank[drm_crtc_index(crtc)].queue,
+				old_crtc_state->last_vblank_count != drm_vblank_count(dev, i),
+				msecs_to_jiffies(32));
 
 		drm_crtc_vblank_put(crtc);
 	}
