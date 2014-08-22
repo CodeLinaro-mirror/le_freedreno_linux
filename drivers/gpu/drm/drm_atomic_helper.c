@@ -159,13 +159,14 @@ update_connector_routing(struct drm_atomic_state *state, int conn_idx)
 		}
 	}
 
-	if (!connector_state->crtc) {
-		DRM_DEBUG_KMS("Disabling [CONNECTOR:%d:%s]\n",
-				connector->base.id,
-				connector->name);
-
-		return 0;
-	}
+//// XXX do we need this?
+//	if (!connector_state->crtc) {
+//		DRM_DEBUG_KMS("Disabling [CONNECTOR:%d:%s]\n",
+//				connector->base.id,
+//				connector->name);
+//
+//		return 0;
+//	}
 
 	funcs = connector->helper_private;
 	new_encoder = funcs->best_encoder(connector);
@@ -185,6 +186,15 @@ update_connector_routing(struct drm_atomic_state *state, int conn_idx)
 				      connector->name);
 			return ret;
 		}
+	}
+
+// steal_encoder() can clear connector_state->crtc...
+	if (!connector_state->crtc) {
+		DRM_DEBUG_KMS("Disabling [CONNECTOR:%d:%s]\n",
+				connector->base.id,
+				connector->name);
+
+		return 0;
 	}
 
 	if (new_encoder != connector_state->best_encoder) {
