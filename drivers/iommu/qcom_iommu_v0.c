@@ -69,6 +69,7 @@ static LIST_HEAD(qcom_iommu_devices);
  */
 struct qcom_domain_priv {
 	unsigned long *pgtable;
+	struct iommu_domain *domain;
 	struct list_head iommu_list;  /* list of attached 'struct qcom_iommu' */
 };
 
@@ -373,6 +374,7 @@ static int qcom_iommu_domain_init(struct iommu_domain *domain)
 
 	memset(priv->pgtable, 0, SZ_16K);
 	domain->priv = priv;
+	priv->domain = domain;
 
 //XXX I think not needed?
 	dmac_flush_range(priv->pgtable, priv->pgtable + NUM_FL_PTE);
@@ -446,6 +448,7 @@ static int qcom_iommu_attach_dev(struct iommu_domain *domain, struct device *dev
 			// TODO check for double attaches, etc..
 
 			list_add_tail(&iommu->dom_node, &priv->iommu_list);
+			iommu->domain = domain;
 		}
 	}
 
@@ -875,38 +878,48 @@ static irqreturn_t __fault_handler(int irq, void *dev_id)
 {
 	struct platform_device *pdev = dev_id;
 	struct qcom_iommu *iommu = platform_get_drvdata(pdev);
+	struct qcom_iommu_ctx *iommu_ctx = NULL;
 	void __iomem *base = iommu->base;
-	int i, ret;
+	int ret;
+	bool first = true;
 
 	mutex_lock(&qcom_iommu_lock);
-
-	pr_err("Unexpected IOMMU page fault!\n");
-	pr_err("base = %08x\n", (unsigned int) base);
 
 	ret = __enable_clocks(iommu);
 	if (ret)
 		goto fail;
 
-	for (i = 0; i < iommu->ncb; i++) {
+	list_for_each_entry(iommu_ctx, &iommu->ctx_list, node) {
+		int i = iommu_ctx->num;
 		unsigned int fsr = GET_FSR(base, i);
-//		unsigned long iova;
+		unsigned long iova;
+		int flags;
 
 		if (!fsr)
 			continue;
 
-//		iova = GET_FAR(base, i);
-//
-//		if (!report_iommu_fault(domain, iommu->dev, iova, flags)) {
-//			ret = IRQ_HANDLED;
-//		} else {
-//			// XXX ratelimited
-//		}
-//// XXX do we have control over resume vs retry??
+		iova = GET_FAR(base, i);
 
-		pr_err("Fault occurred in context %d.\n", i);
-		pr_err("name    = %s\n", dev_name(&pdev->dev));
-		pr_err("Interesting registers:\n");
-		print_ctx_regs(base, i);
+		/* TODO without docs, not sure about IOMMU_FAULT_* flags */
+		flags = 0;
+
+		if (!report_iommu_fault(iommu->domain, iommu->dev,
+				iova, flags)) {
+			ret = IRQ_HANDLED;
+		} else {
+			// XXX ratelimited
+			if (first) {
+				/* only print header for first context */
+				pr_err("Unexpected IOMMU page fault!\n");
+				pr_err("base = %08x\n", (unsigned int) base);
+				first = false;
+			}
+			pr_err("Fault occurred in context %d.\n", i);
+			pr_err("name    = %s\n", dev_name(&pdev->dev));
+			pr_err("Interesting registers:\n");
+			print_ctx_regs(base, i);
+		}
+
 		SET_FSR(base, i, fsr);
 		SET_RESUME(base, i, 1);
 	}

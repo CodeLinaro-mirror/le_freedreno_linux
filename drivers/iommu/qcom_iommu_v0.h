@@ -61,6 +61,9 @@
  * @ctx_list: list of 'struct qcom_iommu_ctx'
  * @dev_node: list head in qcom_iommu_devices list
  * @dom_node: list head in domain
+ * @domain: attached domain.  Note that the relationship between domain and
+ *     and iommu's is N:1, ie. an IOMMU can only be attached to one domain,
+ *     but a domain can be attached to many IOMMUs
  */
 struct qcom_iommu {
 	struct device *dev;
@@ -73,6 +76,7 @@ struct qcom_iommu {
 	struct list_head ctx_list;
 	struct list_head dev_node;
 	struct list_head dom_node;
+	struct iommu_domain *domain;
 };
 
 /**
