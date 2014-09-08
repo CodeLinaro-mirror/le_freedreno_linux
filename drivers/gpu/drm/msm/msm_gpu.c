@@ -606,7 +606,7 @@ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 	iommu = iommu_domain_alloc(&platform_bus_type);
 	if (iommu) {
 		dev_info(drm->dev, "%s: using IOMMU\n", name);
-		gpu->mmu = msm_iommu_new(&pdev->dev, iommu);
+		gpu->mmu = msm_iommu_new(&pdev->dev, drm, iommu);
 	} else {
 		dev_info(drm->dev, "%s: no IOMMU, fallback to VRAM carveout!\n", name);
 	}

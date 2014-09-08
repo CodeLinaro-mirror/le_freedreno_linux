@@ -42,7 +42,8 @@ static inline void msm_mmu_init(struct msm_mmu *mmu, struct device *dev,
 	mmu->funcs = funcs;
 }
 
-struct msm_mmu *msm_iommu_new(struct device *dev, struct iommu_domain *domain);
+struct msm_mmu *msm_iommu_new(struct device *dev,
+		struct drm_device *drm, struct iommu_domain *domain);
 struct msm_mmu *msm_gpummu_new(struct device *dev, struct msm_gpu *gpu);
 
 #endif /* __MSM_MMU_H__ */

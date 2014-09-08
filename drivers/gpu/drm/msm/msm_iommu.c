@@ -17,6 +17,8 @@
 
 #include "msm_drv.h"
 #include "msm_mmu.h"
+// XXX hack
+#include "msm_gpu.h"
 
 struct msm_iommu {
 	struct msm_mmu base;
@@ -27,7 +29,20 @@ struct msm_iommu {
 static int msm_fault_handler(struct iommu_domain *iommu, struct device *dev,
 		unsigned long iova, int flags, void *arg)
 {
-	pr_warn_ratelimited("*** fault: iova=%08lx, flags=%d\n", iova, flags);
+	static DEFINE_RATELIMIT_STATE(rs, (1 * HZ), 5);
+
+	if (__ratelimit(&rs)) {
+		extern bool hang_debug;
+		pr_warn("*** fault: iova=%08lx, flags=%d\n", iova, flags);
+		if (hang_debug) {
+			struct drm_device *drm = arg;
+			struct msm_drm_private *priv = drm->dev_private;
+			struct msm_gpu *gpu = priv->gpu;
+
+			gpu->funcs->dump(gpu);
+		}
+	}
+
 	return 0;
 }
 
@@ -124,7 +139,8 @@ static const struct msm_mmu_funcs funcs = {
 		.destroy = msm_iommu_destroy,
 };
 
-struct msm_mmu *msm_iommu_new(struct device *dev, struct iommu_domain *domain)
+struct msm_mmu *msm_iommu_new(struct device *dev,
+		struct drm_device *drm, struct iommu_domain *domain)
 {
 	struct msm_iommu *iommu;
 
@@ -134,7 +150,7 @@ struct msm_mmu *msm_iommu_new(struct device *dev, struct iommu_domain *domain)
 
 	iommu->domain = domain;
 	msm_mmu_init(&iommu->base, dev, &funcs);
-	iommu_set_fault_handler(domain, msm_fault_handler, dev);
+	iommu_set_fault_handler(domain, msm_fault_handler, drm);
 
 	return &iommu->base;
 }
