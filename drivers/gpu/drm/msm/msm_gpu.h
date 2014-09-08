@@ -53,6 +53,7 @@ struct msm_gpu_funcs {
 	irqreturn_t (*irq)(struct msm_gpu *irq);
 	uint32_t (*last_fence)(struct msm_gpu *gpu);
 	void (*recover)(struct msm_gpu *gpu);
+	void (*dump)(struct msm_gpu *gpu);
 	void (*destroy)(struct msm_gpu *gpu);
 #ifdef CONFIG_DEBUG_FS
 	/* show GPU status in debugfs: */

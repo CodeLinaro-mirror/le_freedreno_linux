@@ -414,6 +414,7 @@ static const struct adreno_gpu_funcs funcs = {
 		.pm_suspend = msm_gpu_pm_suspend,
 		.pm_resume = msm_gpu_pm_resume,
 		.recover = a3xx_recover,
+		.dump = a3xx_dump,
 		.last_fence = adreno_last_fence,
 		.submit = adreno_submit,
 		.flush = adreno_flush,
