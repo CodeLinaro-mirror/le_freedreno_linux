@@ -60,6 +60,7 @@
 	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
 
 #define ARM_CPU_IMP_ARM			0x41
+#define ARM_CPU_IMP_QCOM		0x51
 #define ARM_CPU_IMP_INTEL		0x69
 
 /* ARM implemented processors */

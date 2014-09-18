@@ -746,6 +746,13 @@ static int __init vfp_init(void)
 		hotcpu_notifier(vfp_hotplug, 0);
 
 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
+
+		/*
+		 * Qualcomm implementations are VFPv3 architecture or later
+		 * with common VFP subarchitecture v3
+		 */
+		if (ARM_CPU_IMP_QCOM == ((vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT))
+			VFP_arch = 4;
 		pr_cont("implementor %02x architecture %d part %02x variant %x rev %x\n",
 			(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
 			(vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT,
