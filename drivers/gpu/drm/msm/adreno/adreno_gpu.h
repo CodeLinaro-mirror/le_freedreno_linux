@@ -140,7 +140,7 @@ void adreno_idle(struct msm_gpu *gpu);
 void adreno_show(struct msm_gpu *gpu, struct seq_file *m);
 #endif
 void adreno_dump(struct msm_gpu *gpu);
-void adreno_wait_ring(struct msm_gpu *gpu, uint32_t ndwords);
+void adreno_wait_ring_contiguous(struct msm_gpu *gpu, uint32_t ndwords);
 
 int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 		struct adreno_gpu *gpu, const struct adreno_gpu_funcs *funcs);
@@ -152,7 +152,7 @@ void adreno_gpu_cleanup(struct adreno_gpu *gpu);
 static inline void
 OUT_PKT0(struct msm_ringbuffer *ring, uint16_t regindx, uint16_t cnt)
 {
-	adreno_wait_ring(ring->gpu, cnt+1);
+	adreno_wait_ring_contiguous(ring->gpu, cnt+1);
 	OUT_RING(ring, CP_TYPE0_PKT | ((cnt-1) << 16) | (regindx & 0x7FFF));
 }
 
@@ -160,14 +160,14 @@ OUT_PKT0(struct msm_ringbuffer *ring, uint16_t regindx, uint16_t cnt)
 static inline void
 OUT_PKT2(struct msm_ringbuffer *ring)
 {
-	adreno_wait_ring(ring->gpu, 1);
+	adreno_wait_ring_contiguous(ring->gpu, 1);
 	OUT_RING(ring, CP_TYPE2_PKT);
 }
 
 static inline void
 OUT_PKT3(struct msm_ringbuffer *ring, uint8_t opcode, uint16_t cnt)
 {
-	adreno_wait_ring(ring->gpu, cnt+1);
+	adreno_wait_ring_contiguous(ring->gpu, cnt+1);
 	OUT_RING(ring, CP_TYPE3_PKT | ((cnt-1) << 16) | ((opcode & 0xFF) << 8));
 }
 
