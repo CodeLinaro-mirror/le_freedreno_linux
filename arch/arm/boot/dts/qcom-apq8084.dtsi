@@ -3,6 +3,7 @@
 #include "skeleton.dtsi"
 
 #include <dt-bindings/clock/qcom,gcc-apq8084.h>
+#include <dt-bindings/clock/qcom,mmcc-apq8084.h>
 #include <dt-bindings/gpio/gpio.h>
 
 / {
@@ -230,6 +231,13 @@
 			reg = <0xfc400000 0x4000>;
 		};
 
+		mmcc: clock-controller@fd8c0000 {
+			compatible = "qcom,mmcc-apq8084";
+			#clock-cells = <1>;
+			#reset-cells = <1>;
+			reg = <0xfd8c0000 0x40000>;
+		};
+
 		tlmm: pinctrl@fd510000 {
 			compatible = "qcom,apq8084-pinctrl";
 			reg = <0xfd510000 0x4000>;
@@ -238,6 +246,14 @@
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			interrupts = <0 208 0>;
+
+//qcom,hdmi-tx-cec = <&msmgpio 31 0>;
+//qcom,hdmi-tx-ddc-clk = <&msmgpio 32 0>;
+//qcom,hdmi-tx-ddc-data = <&msmgpio 33 0>;
+//qcom,hdmi-tx-hpd = <&msmgpio 34 0>;
+//			hdmi_pinctrl: hdmi-pinctrl {
+// ????
+//			};
 		};
 
 		serial@f995e000 {
@@ -269,6 +285,92 @@
 			clocks = <&gcc GCC_SDCC2_APPS_CLK>, <&gcc GCC_SDCC2_AHB_CLK>;
 			clock-names = "core", "iface";
 			status = "disabled";
+		};
+
+		hdmi: qcom,hdmi-tx@fd922100 {
+			compatible = "qcom,hdmi-tx-8074";
+			reg-names =
+			    "core_physical",
+			    "phy_physical";
+			reg =
+			    <0xfd922100 0x380>,
+			    <0xfd922500 0x7C>;
+			clock-names =
+			    "core_clk",
+			    "iface_clk",
+			    "mdp_core_clk";
+			clocks =
+			    <&mmcc MDSS_HDMI_CLK>,
+			    <&mmcc MDSS_AHB_CLK>,
+			    <&mmcc MDSS_MDP_CLK>;
+
+			qcom,hdmi-tx-ddc-clk = <&tlmm 32 GPIO_ACTIVE_HIGH>;
+			qcom,hdmi-tx-ddc-data = <&tlmm 33 GPIO_ACTIVE_HIGH>;
+			qcom,hdmi-tx-hpd = <&tlmm 34 GPIO_ACTIVE_HIGH>;
+
+//			core-vdda-supply = <&pm8921_hdmi_mvs>;
+//			hdmi-mux-supply = <&ext_3p3v>;
+
+//			pinctrl-names = "default";
+//			pinctrl-0 = <&hdmi_pinctrl>;
+		};
+
+		gpu: qcom,adreno-3xx@fdb00000 {
+			compatible = "qcom,adreno-3xx";
+			#stream-id-cells = <16>;
+			reg-names =
+			    "kgsl_3d0_reg_memory",
+			    "kgsl_3d0_shader_memory";
+			reg =
+			    <0xfdb00000 0x1b000>,
+			    <0xfdb20000 0x10000>;
+			interrupts = <0 33 0>;
+			interrupt-names = "kgsl_3d0_irq";
+			clock-names =
+			    "core_clk",
+			    "iface_clk";
+			clocks =
+			    <&mmcc OXILI_GFX3D_CLK>,
+			    <&mmcc OXILICX_AHB_CLK>;
+			qcom,chipid = <0x04020000>;
+			qcom,gpu-pwrlevels {
+				compatible = "qcom,gpu-pwrlevels";
+				qcom,gpu-pwrlevel@0 {
+					qcom,gpu-freq = <600000000>;
+				};
+				qcom,gpu-pwrlevel@1 {
+					qcom,gpu-freq = <240000000>;
+				};
+			};
+		};
+
+		mdp: qcom,mdss_mdp@fd900000 {
+			compatible = "qcom,mdss_mdp";
+			#stream-id-cells = <2>;
+			reg-names =
+			    "mdp_phys",
+			    "vbif_phys";
+			reg =
+			    <0xfd900000 0x22100>,
+			    <0xfd924000 0x1000>;
+			interrupts = <0 72 0>;
+			connectors = <&hdmi>;
+			gpus = <&gpu>;
+			clock-names =
+			    "bus_clk",
+			    "iface_clk",
+			    "core_clk_src",
+			    "core_clk",
+			    "lut_clk",
+			    "vsync_clk";
+			clocks =
+			    <&mmcc MDSS_AXI_CLK>,
+			    <&mmcc MDSS_AHB_CLK>,
+			    <&mmcc MDP_CLK_SRC>,
+			    <&mmcc MDSS_MDP_CLK>,
+			    <&mmcc MDSS_MDP_LUT_CLK>,
+			    <&mmcc MDSS_VSYNC_CLK>;
+//			vdd-supply = <&gdsc_mdss>;
 		};
 	};
 };
