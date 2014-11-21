@@ -96,5 +96,33 @@ drm_atomic_helper_connector_duplicate_state(struct drm_connector *connector);
 void drm_atomic_helper_connector_destroy_state(struct drm_connector *connector,
 					  struct drm_connector_state *state);
 
+#define __drm_for_each_plane_mask(plane, dev, plane_mask) \
+	list_for_each_entry((plane), &(dev)->mode_config.plane_list, head) \
+		if ((plane_mask) & (1 << drm_plane_index(plane)))
+
+/**
+ * drm_atomic_crtc_for_each_plane - iterate over planes currently attached to CRTC
+ * @plane: the loop cursor
+ * @crtc:  the crtc whose planes are iterated
+ *
+ * This iterates over the current state, useful (for example) when applying
+ * atomic state after it has been checked and swapped.  To iterate over the
+ * planes which *will* be attached (for ->atomic_check()) see
+ * drm_crtc_for_each_pending_plane()
+ */
+#define drm_atomic_crtc_for_each_plane(plane, crtc) \
+	__drm_for_each_plane_mask(plane, (crtc)->dev, (crtc)->state->plane_mask)
+
+/**
+ * drm_crtc_atomic_state_for_each_plane - iterate over attached planes in new state
+ * @plane: the loop cursor
+ * @crtc_state: the incoming crtc-state
+ *
+ * Similar to drm_crtc_for_each_plane(), but iterates the planes that will be
+ * attached if the specified state is applied.  Useful during (for example)
+ * ->atomic_check() operations, to validate the incoming state
+ */
+#define drm_atomic_crtc_state_for_each_plane(plane, crtc_state) \
+	__drm_for_each_plane_mask(plane, (crtc_state)->state->dev, (crtc_state)->plane_mask)
 
 #endif /* DRM_ATOMIC_HELPER_H_ */
