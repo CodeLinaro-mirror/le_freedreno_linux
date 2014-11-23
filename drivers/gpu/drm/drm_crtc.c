@@ -3859,7 +3859,16 @@ EXPORT_SYMBOL(drm_object_property_set_value);
 int drm_object_property_get_value(struct drm_mode_object *obj,
 				  struct drm_property *property, uint64_t *val)
 {
+	struct drm_mode_config *config = &property->dev->mode_config;
 	int i;
+
+	/* read-only properties bypass atomic mechanism and still store
+	 * their value in obj->properties->values[].. mostly to avoid
+	 * having to deal w/ EDID and similar props in atomic paths:
+	 */
+	if (config->funcs->atomic_get_property &&
+			!(property->flags & DRM_MODE_PROP_IMMUTABLE))
+		return config->funcs->atomic_get_property(obj, property, val);
 
 	for (i = 0; i < obj->properties->count; i++) {
 		if (obj->properties->properties[i] == property) {

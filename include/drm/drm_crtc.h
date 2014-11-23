@@ -292,6 +292,7 @@ struct drm_crtc_state {
  * @atomic_duplicate_state: duplicate the atomic state for this CRTC
  * @atomic_destroy_state: destroy an atomic state for this CRTC
  * @atomic_set_property: set a property on an atomic state for this CRTC
+ * @atomic_get_property: get a property on an atomic state for this CRTC
  *
  * The drm_crtc_funcs structure is the central CRTC management structure
  * in the DRM.  Each CRTC controls one or more connectors (note that the name
@@ -351,6 +352,10 @@ struct drm_crtc_funcs {
 				   struct drm_crtc_state *state,
 				   struct drm_property *property,
 				   uint64_t val);
+	int (*atomic_get_property)(struct drm_crtc *crtc,
+				   const struct drm_crtc_state *state,
+				   struct drm_property *property,
+				   uint64_t *val);
 };
 
 /**
@@ -475,6 +480,7 @@ struct drm_connector_state {
  * @atomic_duplicate_state: duplicate the atomic state for this connector
  * @atomic_destroy_state: destroy an atomic state for this connector
  * @atomic_set_property: set a property on an atomic state for this connector
+ * @atomic_get_property: get a property on an atomic state for this connector
  *
  * Each CRTC may have one or more connectors attached to it.  The functions
  * below allow the core DRM code to control connectors, enumerate available modes,
@@ -508,6 +514,10 @@ struct drm_connector_funcs {
 				   struct drm_connector_state *state,
 				   struct drm_property *property,
 				   uint64_t val);
+	int (*atomic_get_property)(struct drm_connector *connector,
+				   const struct drm_connector_state *state,
+				   struct drm_property *property,
+				   uint64_t *val);
 };
 
 /**
@@ -715,6 +725,7 @@ struct drm_plane_state {
  * @atomic_duplicate_state: duplicate the atomic state for this plane
  * @atomic_destroy_state: destroy an atomic state for this plane
  * @atomic_set_property: set a property on an atomic state for this plane
+ * @atomic_get_property: get a property on an atomic state for this plane
  */
 struct drm_plane_funcs {
 	int (*update_plane)(struct drm_plane *plane,
@@ -738,6 +749,10 @@ struct drm_plane_funcs {
 				   struct drm_plane_state *state,
 				   struct drm_property *property,
 				   uint64_t val);
+	int (*atomic_get_property)(struct drm_plane *plane,
+				   const struct drm_plane_state *state,
+				   struct drm_property *property,
+				   uint64_t *val);
 };
 
 enum drm_plane_type {
@@ -892,6 +907,7 @@ struct drm_mode_set {
  * struct drm_mode_config_funcs - basic driver provided mode setting functions
  * @fb_create: create a new framebuffer object
  * @output_poll_changed: function to handle output configuration changes
+ * @atomic_get_property: atomic way to read property value
  * @atomic_check: check whether a give atomic state update is possible
  * @atomic_commit: commit an atomic state update previously verified with
  * 	atomic_check()
@@ -905,6 +921,8 @@ struct drm_mode_config_funcs {
 					     struct drm_mode_fb_cmd2 *mode_cmd);
 	void (*output_poll_changed)(struct drm_device *dev);
 
+	int (*atomic_get_property)(struct drm_mode_object *obj,
+				struct drm_property *property, uint64_t *val);
 	int (*atomic_check)(struct drm_device *dev,
 			    struct drm_atomic_state *a);
 	int (*atomic_commit)(struct drm_device *dev,
