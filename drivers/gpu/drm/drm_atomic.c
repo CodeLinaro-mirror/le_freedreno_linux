@@ -217,6 +217,28 @@ drm_atomic_get_crtc_state(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_get_crtc_state);
 
 /**
+ *
+ */
+int drm_atomic_set_crtc_property(struct drm_crtc *crtc,
+		struct drm_crtc_state *state, struct drm_property *property,
+		uint64_t val)
+{
+	return 0;  // XXX
+}
+EXPORT_SYMBOL(drm_atomic_set_crtc_property);
+
+/**
+ *
+ */
+int drm_atomic_get_crtc_property(struct drm_crtc *crtc,
+		const struct drm_crtc_state *state,
+		struct drm_property *property, uint64_t *val)
+{
+	return 0;  // XXX
+}
+EXPORT_SYMBOL(drm_atomic_get_crtc_property);
+
+/**
  * drm_atomic_get_plane_state - get plane state
  * @state: global atomic state object
  * @plane: plane to get state object for

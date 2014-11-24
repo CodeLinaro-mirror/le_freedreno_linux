@@ -460,7 +460,7 @@ int drm_atomic_helper_check(struct drm_device *dev,
 
 		funcs = crtc->helper_private;
 
-		if (!funcs || !funcs->atomic_check)
+		if (!funcs || WARN_ON(!funcs->atomic_check))
 			continue;
 
 		ret = funcs->atomic_check(crtc, state->crtc_states[i]);
@@ -1898,6 +1898,20 @@ void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
 	kfree(state);
 }
 EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
+
+/**
+ * blah blah blah
+ */
+int drm_atomic_helper_crtc_check(struct drm_crtc *crtc,
+		struct drm_crtc_state *state)
+{
+	/* TODO anything to check?  I think if drivers want to enforce that
+	 * primary layer covers entire screen, they should do that in their
+	 * own crtc->atomic_check() fxn..
+	 */
+	return 0;
+}
+EXPORT_SYMBOL(drm_atomic_helper_crtc_check);
 
 /**
  * drm_atomic_helper_plane_reset - default ->reset hook for planes

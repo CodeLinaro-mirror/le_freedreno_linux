@@ -38,6 +38,12 @@ void drm_atomic_state_free(struct drm_atomic_state *state);
 struct drm_crtc_state * __must_check
 drm_atomic_get_crtc_state(struct drm_atomic_state *state,
 			  struct drm_crtc *crtc);
+int drm_atomic_set_crtc_property(struct drm_crtc *crtc,
+		struct drm_crtc_state *state, struct drm_property *property,
+		uint64_t val);
+int drm_atomic_get_crtc_property(struct drm_crtc *crtc,
+		const struct drm_crtc_state *state,
+		struct drm_property *property, uint64_t *val);
 struct drm_plane_state * __must_check
 drm_atomic_get_plane_state(struct drm_atomic_state *state,
 			   struct drm_plane *plane);
