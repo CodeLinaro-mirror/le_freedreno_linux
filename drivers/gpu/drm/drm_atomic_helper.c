@@ -440,7 +440,7 @@ int drm_atomic_helper_check(struct drm_device *dev,
 
 		drm_atomic_helper_plane_changed(state, plane_state, plane);
 
-		if (!funcs || !funcs->atomic_check)
+		if (!funcs || WARN_ON(!funcs->atomic_check))
 			continue;
 
 		ret = funcs->atomic_check(plane, plane_state);
@@ -1957,6 +1957,69 @@ void drm_atomic_helper_plane_destroy_state(struct drm_plane *plane,
 	kfree(state);
 }
 EXPORT_SYMBOL(drm_atomic_helper_plane_destroy_state);
+
+/**
+ * blah blah blah
+ *
+ * TODO maybe generic checks shouldn't be in helper?  Might be kinda
+ * nice for __setplane_internal() to build up a fake state object to
+ * re-use this..
+ */
+int drm_atomic_helper_plane_check(struct drm_plane *plane,
+		struct drm_plane_state *state)
+{
+	unsigned int fb_width, fb_height;
+	unsigned int i;
+
+	/* either *both* CRTC and FB must be set, or neither */
+	if (WARN_ON(state->crtc && !state->fb)) {
+		DRM_DEBUG_KMS("CRTC set but no FB\n");
+		return -EINVAL;
+	} else if (WARN_ON(state->fb && !state->crtc)) {
+		DRM_DEBUG_KMS("FB set but no CRTC\n");
+		return -EINVAL;
+	}
+
+	/* if disabled, we don't care about the rest of the state: */
+	if (!state->crtc)
+		return 0;
+
+	/* Check whether this plane is usable on this CRTC */
+	if (!(plane->possible_crtcs & drm_crtc_mask(state->crtc))) {
+		DRM_DEBUG_KMS("Invalid crtc for plane\n");
+		return -EINVAL;
+	}
+
+	/* Check whether this plane supports the fb pixel format. */
+	for (i = 0; i < plane->format_count; i++)
+		if (state->fb->pixel_format == plane->format_types[i])
+			break;
+	if (i == plane->format_count) {
+		DRM_DEBUG_KMS("Invalid pixel format %s\n",
+			      drm_get_format_name(state->fb->pixel_format));
+		return -EINVAL;
+	}
+
+	fb_width = state->fb->width << 16;
+	fb_height = state->fb->height << 16;
+
+	/* Make sure source coordinates are inside the fb. */
+	if (state->src_w > fb_width ||
+	    state->src_x > fb_width - state->src_w ||
+	    state->src_h > fb_height ||
+	    state->src_y > fb_height - state->src_h) {
+		DRM_DEBUG_KMS("Invalid source coordinates "
+			      "%u.%06ux%u.%06u+%u.%06u+%u.%06u\n",
+			      state->src_w >> 16, ((state->src_w & 0xffff) * 15625) >> 10,
+			      state->src_h >> 16, ((state->src_h & 0xffff) * 15625) >> 10,
+			      state->src_x >> 16, ((state->src_x & 0xffff) * 15625) >> 10,
+			      state->src_y >> 16, ((state->src_y & 0xffff) * 15625) >> 10);
+		return -ENOSPC;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_atomic_helper_plane_check);
 
 /**
  * drm_atomic_helper_connector_reset - default ->reset hook for connectors

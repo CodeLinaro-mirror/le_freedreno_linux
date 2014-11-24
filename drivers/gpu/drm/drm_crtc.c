@@ -1162,6 +1162,7 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 			     const uint32_t *formats, uint32_t format_count,
 			     enum drm_plane_type type)
 {
+	struct drm_mode_config *config = &dev->mode_config;
 	int ret;
 
 	ret = drm_mode_object_get(dev, &plane->base, DRM_MODE_OBJECT_PLANE);
@@ -1186,14 +1187,29 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 	plane->possible_crtcs = possible_crtcs;
 	plane->type = type;
 
-	list_add_tail(&plane->head, &dev->mode_config.plane_list);
-	dev->mode_config.num_total_plane++;
+	list_add_tail(&plane->head, &config->plane_list);
+	config->num_total_plane++;
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY)
-		dev->mode_config.num_overlay_plane++;
+		config->num_overlay_plane++;
 
 	drm_object_attach_property(&plane->base,
-				   dev->mode_config.plane_type_property,
+				   config->plane_type_property,
 				   plane->type);
+
+	if (funcs->atomic_set_property) {
+		WARN_ON(!funcs->atomic_get_property);  /* atomic drivers need both */
+
+		drm_object_attach_property(&plane->base, config->prop_fb_id, 0);
+		drm_object_attach_property(&plane->base, config->prop_crtc_id, 0);
+		drm_object_attach_property(&plane->base, config->prop_crtc_x, 0);
+		drm_object_attach_property(&plane->base, config->prop_crtc_y, 0);
+		drm_object_attach_property(&plane->base, config->prop_crtc_w, 0);
+		drm_object_attach_property(&plane->base, config->prop_crtc_h, 0);
+		drm_object_attach_property(&plane->base, config->prop_src_x, 0);
+		drm_object_attach_property(&plane->base, config->prop_src_y, 0);
+		drm_object_attach_property(&plane->base, config->prop_src_w, 0);
+		drm_object_attach_property(&plane->base, config->prop_src_h, 0);
+	}
 
 	return 0;
 }
@@ -1342,6 +1358,59 @@ static int drm_mode_create_standard_connector_properties(struct drm_device *dev)
 	if (!prop)
 		return -ENOMEM;
 	dev->mode_config.path_property = prop;
+
+	prop = drm_property_create_range(dev, 0, "SRC_X", 0, UINT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_src_x = prop;
+
+	prop = drm_property_create_range(dev, 0, "SRC_Y", 0, UINT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_src_y = prop;
+
+	prop = drm_property_create_range(dev, 0, "SRC_W", 0, UINT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_src_w = prop;
+
+	prop = drm_property_create_range(dev, 0, "SRC_H", 0, UINT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_src_h = prop;
+
+	prop = drm_property_create_signed_range(dev, 0, "CRTC_X",
+			INT_MIN, INT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_crtc_x = prop;
+
+	prop = drm_property_create_signed_range(dev, 0, "CRTC_Y",
+			INT_MIN, INT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_crtc_y = prop;
+
+	prop = drm_property_create_range(dev, 0, "CRTC_W", 0, INT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_crtc_w = prop;
+
+	prop = drm_property_create_range(dev, 0, "CRTC_H", 0, INT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_crtc_h = prop;
+
+	prop = drm_property_create_object(dev, 0, "FB_ID", DRM_MODE_OBJECT_FB);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_fb_id = prop;
+
+	prop = drm_property_create_object(dev, 0,
+			"CRTC_ID", DRM_MODE_OBJECT_CRTC);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.prop_crtc_id = prop;
 
 	return 0;
 }

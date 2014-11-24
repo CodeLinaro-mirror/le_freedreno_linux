@@ -272,6 +272,87 @@ drm_atomic_get_plane_state(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_get_plane_state);
 
 /**
+ *
+ */
+int drm_atomic_set_plane_property(struct drm_plane *plane,
+		struct drm_plane_state *state, struct drm_property *property,
+		uint64_t val)
+{
+	struct drm_device *dev = plane->dev;
+	struct drm_mode_config *config = &dev->mode_config;
+	int ret = 0;
+
+	if (property == config->prop_fb_id) {
+		struct drm_framebuffer *fb = drm_framebuffer_lookup(dev, val);
+		drm_atomic_set_fb_for_plane(state, fb);
+		if (fb)
+			drm_framebuffer_unreference(fb);
+	} else if (property == config->prop_crtc_id) {
+		struct drm_crtc *crtc = drm_crtc_find(dev, val);
+		ret = drm_atomic_set_crtc_for_plane(state->state, plane, crtc);
+	} else if (property == config->prop_crtc_x) {
+		state->crtc_x = U642I64(val);
+	} else if (property == config->prop_crtc_y) {
+		state->crtc_y = U642I64(val);
+	} else if (property == config->prop_crtc_w) {
+		state->crtc_w = val;
+	} else if (property == config->prop_crtc_h) {
+		state->crtc_h = val;
+	} else if (property == config->prop_src_x) {
+		state->src_x = val;
+	} else if (property == config->prop_src_y) {
+		state->src_y = val;
+	} else if (property == config->prop_src_w) {
+		state->src_w = val;
+	} else if (property == config->prop_src_h) {
+		state->src_h = val;
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(drm_atomic_set_plane_property);
+
+/**
+ *
+ */
+int drm_atomic_get_plane_property(struct drm_plane *plane,
+		const struct drm_plane_state *state,
+		struct drm_property *property, uint64_t *val)
+{
+	struct drm_device *dev = plane->dev;
+	struct drm_mode_config *config = &dev->mode_config;
+
+	if (property == config->prop_fb_id) {
+		*val = (state->fb) ? state->fb->base.id : 0;
+	} else if (property == config->prop_crtc_id) {
+		*val = (state->crtc) ? state->crtc->base.id : 0;
+	} else if (property == config->prop_crtc_x) {
+		*val = I642U64(state->crtc_x);
+	} else if (property == config->prop_crtc_y) {
+		*val = I642U64(state->crtc_y);
+	} else if (property == config->prop_crtc_w) {
+		*val = state->crtc_w;
+	} else if (property == config->prop_crtc_h) {
+		*val = state->crtc_h;
+	} else if (property == config->prop_src_x) {
+		*val = state->src_x;
+	} else if (property == config->prop_src_y) {
+		*val = state->src_y;
+	} else if (property == config->prop_src_w) {
+		*val = state->src_w;
+	} else if (property == config->prop_src_h) {
+		*val = state->src_h;
+	} else {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_atomic_get_plane_property);
+
+/**
  * drm_atomic_get_connector_state - get connector state
  * @state: global atomic state object
  * @connector: connector to get state object for
