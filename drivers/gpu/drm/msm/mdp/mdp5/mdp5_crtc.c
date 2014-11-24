@@ -349,7 +349,7 @@ static int mdp5_crtc_atomic_check(struct drm_crtc *crtc,
 				pstates[i].state->stage);
 	}
 
-	return 0;
+	return drm_atomic_helper_crtc_check(crtc, state);
 }
 
 static void mdp5_crtc_atomic_begin(struct drm_crtc *crtc)
@@ -386,6 +386,9 @@ static const struct drm_crtc_funcs mdp5_crtc_funcs = {
 	.set_config = drm_atomic_helper_set_config,
 	.destroy = mdp5_crtc_destroy,
 	.page_flip = drm_atomic_helper_page_flip,
+	.set_property = drm_atomic_helper_crtc_set_property,
+	.atomic_set_property = drm_atomic_set_crtc_property,
+	.atomic_get_property = drm_atomic_get_crtc_property,
 	.reset = drm_atomic_helper_crtc_reset,
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
