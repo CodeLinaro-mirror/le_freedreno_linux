@@ -424,6 +424,56 @@ drm_atomic_get_connector_state(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_get_connector_state);
 
 /**
+ *
+ */
+int drm_atomic_set_connector_property(struct drm_connector *connector,
+		struct drm_connector_state *state, struct drm_property *property,
+		uint64_t val)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_mode_config *config = &dev->mode_config;
+	int ret = 0;
+
+	if (property == config->prop_crtc_id) {
+		struct drm_crtc *crtc = drm_crtc_find(dev, val);
+		ret = drm_atomic_set_crtc_for_connector(state, crtc);
+	} else if (property == config->dpms_property) {
+		/* setting DPMS property requires special handling, which
+		 * is done in legacy setprop path for us.  Disallow (for
+		 * now?) atomic writes to DPMS property:
+		 */
+		ret = -EINVAL;
+	} else {
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(drm_atomic_set_connector_property);
+
+/**
+ *
+ */
+int drm_atomic_get_connector_property(struct drm_connector *connector,
+		const struct drm_connector_state *state,
+		struct drm_property *property, uint64_t *val)
+{
+	struct drm_device *dev = connector->dev;
+	struct drm_mode_config *config = &dev->mode_config;
+
+	if (property == config->prop_crtc_id) {
+		*val = (state->crtc) ? state->crtc->base.id : 0;
+	} else if (property == config->dpms_property) {
+		*val = connector->dpms;
+	} else {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_atomic_get_connector_property);
+
+/**
  * drm_atomic_set_crtc_for_plane - set crtc for plane
  * @state: the incoming atomic state
  * @plane: the plane whose incoming state to update

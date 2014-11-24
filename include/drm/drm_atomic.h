@@ -50,6 +50,12 @@ int drm_atomic_get_plane_property(struct drm_plane *plane,
 struct drm_connector_state * __must_check
 drm_atomic_get_connector_state(struct drm_atomic_state *state,
 			       struct drm_connector *connector);
+int drm_atomic_set_connector_property(struct drm_connector *connector,
+		struct drm_connector_state *state, struct drm_property *property,
+		uint64_t val);
+int drm_atomic_get_connector_property(struct drm_connector *connector,
+		const struct drm_connector_state *state,
+		struct drm_property *property, uint64_t *val);
 
 int __must_check
 drm_atomic_set_crtc_for_plane(struct drm_atomic_state *state,
