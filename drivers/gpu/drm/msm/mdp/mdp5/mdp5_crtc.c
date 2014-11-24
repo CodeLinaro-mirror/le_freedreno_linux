@@ -382,18 +382,10 @@ static void mdp5_crtc_atomic_flush(struct drm_crtc *crtc)
 	}
 }
 
-static int mdp5_crtc_set_property(struct drm_crtc *crtc,
-		struct drm_property *property, uint64_t val)
-{
-	// XXX
-	return -EINVAL;
-}
-
 static const struct drm_crtc_funcs mdp5_crtc_funcs = {
 	.set_config = drm_atomic_helper_set_config,
 	.destroy = mdp5_crtc_destroy,
 	.page_flip = drm_atomic_helper_page_flip,
-	.set_property = mdp5_crtc_set_property,
 	.reset = drm_atomic_helper_crtc_reset,
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
@@ -538,8 +530,6 @@ struct drm_crtc *mdp5_crtc_init(struct drm_device *dev,
 	drm_crtc_init_with_planes(dev, crtc, plane, NULL, &mdp5_crtc_funcs);
 	drm_crtc_helper_add(crtc, &mdp5_crtc_helper_funcs);
 	plane->crtc = crtc;
-
-	mdp5_plane_install_properties(plane, &crtc->base);
 
 	return crtc;
 }

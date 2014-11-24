@@ -185,8 +185,6 @@ uint32_t mdp4_get_formats(enum mdp4_pipe pipe_id, uint32_t *pixel_formats,
 	return mdp_get_formats(pixel_formats, max_formats);
 }
 
-void mdp4_plane_install_properties(struct drm_plane *plane,
-		struct drm_mode_object *obj);
 enum mdp4_pipe mdp4_plane_pipe(struct drm_plane *plane);
 struct drm_plane *mdp4_plane_init(struct drm_device *dev,
 		enum mdp4_pipe pipe_id, bool private_plane);

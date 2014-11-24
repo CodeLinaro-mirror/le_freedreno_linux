@@ -370,13 +370,6 @@ static void mdp4_crtc_atomic_flush(struct drm_crtc *crtc)
 	request_pending(crtc, PENDING_FLIP);
 }
 
-static int mdp4_crtc_set_property(struct drm_crtc *crtc,
-		struct drm_property *property, uint64_t val)
-{
-	// XXX
-	return -EINVAL;
-}
-
 #define CURSOR_WIDTH 64
 #define CURSOR_HEIGHT 64
 
@@ -508,7 +501,6 @@ static const struct drm_crtc_funcs mdp4_crtc_funcs = {
 	.set_config = drm_atomic_helper_set_config,
 	.destroy = mdp4_crtc_destroy,
 	.page_flip = drm_atomic_helper_page_flip,
-	.set_property = mdp4_crtc_set_property,
 	.cursor_set = mdp4_crtc_cursor_set,
 	.cursor_move = mdp4_crtc_cursor_move,
 	.reset = drm_atomic_helper_crtc_reset,
@@ -662,8 +654,6 @@ struct drm_crtc *mdp4_crtc_init(struct drm_device *dev,
 	drm_crtc_init_with_planes(dev, crtc, plane, NULL, &mdp4_crtc_funcs);
 	drm_crtc_helper_add(crtc, &mdp4_crtc_helper_funcs);
 	plane->crtc = crtc;
-
-	mdp4_plane_install_properties(plane, &crtc->base);
 
 	return crtc;
 }

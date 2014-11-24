@@ -56,25 +56,10 @@ static void mdp4_plane_destroy(struct drm_plane *plane)
 	kfree(mdp4_plane);
 }
 
-/* helper to install properties which are common to planes and crtcs */
-void mdp4_plane_install_properties(struct drm_plane *plane,
-		struct drm_mode_object *obj)
-{
-	// XXX
-}
-
-int mdp4_plane_set_property(struct drm_plane *plane,
-		struct drm_property *property, uint64_t val)
-{
-	// XXX
-	return -EINVAL;
-}
-
 static const struct drm_plane_funcs mdp4_plane_funcs = {
 		.update_plane = drm_atomic_helper_update_plane,
 		.disable_plane = drm_atomic_helper_disable_plane,
 		.destroy = mdp4_plane_destroy,
-		.set_property = mdp4_plane_set_property,
 		.reset = drm_atomic_helper_plane_reset,
 		.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
 		.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
@@ -281,8 +266,6 @@ struct drm_plane *mdp4_plane_init(struct drm_device *dev,
 		goto fail;
 
 	drm_plane_helper_add(plane, &mdp4_plane_helper_funcs);
-
-	mdp4_plane_install_properties(plane, &plane->base);
 
 	return plane;
 
