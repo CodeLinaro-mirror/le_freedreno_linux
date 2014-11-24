@@ -175,8 +175,6 @@ uint32_t mdp5_get_formats(enum mdp5_pipe pipe, uint32_t *pixel_formats,
 	return mdp_get_formats(pixel_formats, max_formats);
 }
 
-void mdp5_plane_install_properties(struct drm_plane *plane,
-		struct drm_mode_object *obj);
 uint32_t mdp5_plane_get_flush(struct drm_plane *plane);
 void mdp5_plane_complete_flip(struct drm_plane *plane);
 enum mdp5_pipe mdp5_plane_pipe(struct drm_plane *plane);
