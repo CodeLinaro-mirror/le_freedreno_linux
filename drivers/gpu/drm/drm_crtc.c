@@ -4730,6 +4730,52 @@ out:
 	return ret;
 }
 
+static struct drm_pending_vblank_event *create_vblank_event(
+		struct drm_device *dev, struct drm_file *file_priv, uint64_t user_data)
+{
+	struct drm_pending_vblank_event *e = NULL;
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->event_lock, flags);
+	if (file_priv->event_space < sizeof e->event) {
+		spin_unlock_irqrestore(&dev->event_lock, flags);
+		goto out;
+	}
+	file_priv->event_space -= sizeof e->event;
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+
+	e = kzalloc(sizeof *e, GFP_KERNEL);
+	if (e == NULL) {
+		spin_lock_irqsave(&dev->event_lock, flags);
+		file_priv->event_space += sizeof e->event;
+		spin_unlock_irqrestore(&dev->event_lock, flags);
+		goto out;
+	}
+
+	e->event.base.type = DRM_EVENT_FLIP_COMPLETE;
+	e->event.base.length = sizeof e->event;
+	e->event.user_data = user_data;
+	e->base.event = &e->event.base;
+	e->base.file_priv = file_priv;
+	e->base.destroy = (void (*) (struct drm_pending_event *)) kfree;
+
+out:
+	return e;
+}
+
+static void destroy_vblank_event(struct drm_device *dev,
+		struct drm_file *file_priv, struct drm_pending_vblank_event *e)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->event_lock, flags);
+	file_priv->event_space += sizeof e->event;
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+	kfree(e);
+}
+
+
+
 /**
  * drm_mode_page_flip_ioctl - schedule an asynchronous fb update
  * @dev: DRM device
@@ -4755,10 +4801,9 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 	struct drm_crtc *crtc;
 	struct drm_framebuffer *fb = NULL;
 	struct drm_pending_vblank_event *e = NULL;
-	unsigned long flags;
 	int ret = -EINVAL;
 
-	if (page_flip->flags & ~DRM_MODE_PAGE_FLIP_FLAGS ||
+	if ((page_flip->flags & ~DRM_MODE_PAGE_FLIP_FLAGS) ||
 	    page_flip->reserved != 0)
 		return -EINVAL;
 
@@ -4799,41 +4844,18 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 	}
 
 	if (page_flip->flags & DRM_MODE_PAGE_FLIP_EVENT) {
-		ret = -ENOMEM;
-		spin_lock_irqsave(&dev->event_lock, flags);
-		if (file_priv->event_space < sizeof e->event) {
-			spin_unlock_irqrestore(&dev->event_lock, flags);
+		e = create_vblank_event(dev, file_priv, page_flip->user_data);
+		if (!e) {
+			ret = -ENOMEM;
 			goto out;
 		}
-		file_priv->event_space -= sizeof e->event;
-		spin_unlock_irqrestore(&dev->event_lock, flags);
-
-		e = kzalloc(sizeof *e, GFP_KERNEL);
-		if (e == NULL) {
-			spin_lock_irqsave(&dev->event_lock, flags);
-			file_priv->event_space += sizeof e->event;
-			spin_unlock_irqrestore(&dev->event_lock, flags);
-			goto out;
-		}
-
-		e->event.base.type = DRM_EVENT_FLIP_COMPLETE;
-		e->event.base.length = sizeof e->event;
-		e->event.user_data = page_flip->user_data;
-		e->base.event = &e->event.base;
-		e->base.file_priv = file_priv;
-		e->base.destroy =
-			(void (*) (struct drm_pending_event *)) kfree;
 	}
 
 	crtc->primary->old_fb = crtc->primary->fb;
 	ret = crtc->funcs->page_flip(crtc, fb, e, page_flip->flags);
 	if (ret) {
-		if (page_flip->flags & DRM_MODE_PAGE_FLIP_EVENT) {
-			spin_lock_irqsave(&dev->event_lock, flags);
-			file_priv->event_space += sizeof e->event;
-			spin_unlock_irqrestore(&dev->event_lock, flags);
-			kfree(e);
-		}
+		if (e)
+			destroy_vblank_event(dev, file_priv, e);
 		/* Keep the old fb, don't unref it. */
 		crtc->primary->old_fb = NULL;
 	} else {
