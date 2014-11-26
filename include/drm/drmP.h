@@ -876,7 +876,6 @@ extern ssize_t drm_read(struct file *filp, char __user *buffer,
 			size_t count, loff_t *offset);
 extern int drm_release(struct inode *inode, struct file *filp);
 
-				/* Mapping support (drm_vm.h) */
 extern unsigned int drm_poll(struct file *filp, struct poll_table_struct *wait);
 
 /* Misc. IOCTL support (drm_ioctl.c) */
@@ -1065,5 +1064,12 @@ static __inline__ bool drm_can_sleep(void)
 		return false;
 	return true;
 }
+
+int drm_event_reserve_init(struct drm_device *dev,
+		struct drm_file *file_priv,
+		struct drm_pending_event *p,
+		struct drm_event *e);
+void drm_event_cancel_free(struct drm_device *dev,
+		struct drm_pending_event *p);
 
 #endif

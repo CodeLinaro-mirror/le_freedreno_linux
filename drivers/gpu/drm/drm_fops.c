@@ -551,3 +551,50 @@ unsigned int drm_poll(struct file *filp, struct poll_table_struct *wait)
 	return mask;
 }
 EXPORT_SYMBOL(drm_poll);
+
+/**
+ *
+ */
+int drm_event_reserve_init(struct drm_device *dev,
+		struct drm_file *file_priv,
+		struct drm_pending_event *p,
+		struct drm_event *e)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&dev->event_lock, flags);
+
+	if (file_priv->event_space < e->length) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	file_priv->event_space -= e->length;
+
+	p->event = e;
+	p->file_priv = file_priv;
+
+	/* we *could* pass this in as arg, but everyone uses kfree: */
+	p->destroy = (void (*) (struct drm_pending_event *)) kfree;
+
+out:
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL(drm_event_reserve_init);
+
+/**
+ *
+ */
+void drm_event_cancel_free(struct drm_device *dev,
+		struct drm_pending_event *p)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&dev->event_lock, flags);
+	p->file_priv->event_space += p->event->length;
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+	p->destroy(p);
+}
+EXPORT_SYMBOL(drm_event_cancel_free);
+
