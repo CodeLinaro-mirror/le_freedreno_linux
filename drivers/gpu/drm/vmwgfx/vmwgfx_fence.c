@@ -1105,6 +1105,8 @@ static int vmw_event_fence_action_create(struct drm_file *file_priv,
 	if (ret != 0)
 		goto out_no_queue;
 
+	return 0;
+
 out_no_queue:
 	event->base.destroy(&event->base);
 out_no_event:
