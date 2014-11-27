@@ -138,8 +138,6 @@ static const struct drm_plane_funcs mdp5_plane_funcs = {
 		.destroy = mdp5_plane_destroy,
 		.set_property = drm_atomic_helper_plane_set_property,
 		/* TODO expose zpos property and override atomic_get/set: */
-		.atomic_set_property = drm_atomic_set_plane_property,
-		.atomic_get_property = drm_atomic_get_plane_property,
 		.reset = mdp5_plane_reset,
 		.atomic_duplicate_state = mdp5_plane_duplicate_state,
 		.atomic_destroy_state = mdp5_plane_destroy_state,
@@ -199,7 +197,7 @@ static int mdp5_plane_atomic_check(struct drm_plane *plane,
 		to_mdp5_plane_state(state)->mode_changed = true;
 	}
 
-	return drm_atomic_helper_plane_check(plane, state);
+	return 0;
 }
 
 static void mdp5_plane_atomic_update(struct drm_plane *plane,

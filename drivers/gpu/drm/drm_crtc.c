@@ -885,9 +885,7 @@ int drm_connector_init(struct drm_device *dev,
 	drm_object_attach_property(&connector->base,
 				      config->dpms_property, 0);
 
-	if (funcs->atomic_set_property) {
-		WARN_ON(!funcs->atomic_get_property);  /* atomic drivers need both */
-
+	if (funcs->atomic_duplicate_state) {
 		drm_object_attach_property(&connector->base, config->prop_crtc_id, 0);
 	}
 
@@ -1203,9 +1201,7 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 				   config->plane_type_property,
 				   plane->type);
 
-	if (funcs->atomic_set_property) {
-		WARN_ON(!funcs->atomic_get_property);  /* atomic drivers need both */
-
+	if (funcs->atomic_duplicate_state) {
 		drm_object_attach_property(&plane->base, config->prop_fb_id, 0);
 		drm_object_attach_property(&plane->base, config->prop_crtc_id, 0);
 		drm_object_attach_property(&plane->base, config->prop_crtc_x, 0);
@@ -5513,7 +5509,7 @@ retry:
 					break;
 				}
 
-				ret = connector->funcs->atomic_set_property(connector,
+				ret = drm_atomic_connector_set_property(connector,
 						connector_state, prop, prop_value);
 				break;
 			}
@@ -5527,7 +5523,7 @@ retry:
 					break;
 				}
 
-				ret = crtc->funcs->atomic_set_property(crtc,
+				ret = drm_atomic_crtc_set_property(crtc,
 						crtc_state, prop, prop_value);
 				break;
 			}
@@ -5541,7 +5537,7 @@ retry:
 					break;
 				}
 
-				ret = plane->funcs->atomic_set_property(plane,
+				ret = drm_atomic_plane_set_property(plane,
 						plane_state, prop, prop_value);
 				break;
 			}

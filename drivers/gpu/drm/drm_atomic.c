@@ -217,26 +217,36 @@ drm_atomic_get_crtc_state(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_get_crtc_state);
 
 /**
+ * drm_atomic_crtc_set_property - set property on connector
  *
+ * Use this instead of calling crtc->atomic_set_property directly
  */
-int drm_atomic_set_crtc_property(struct drm_crtc *crtc,
+int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		struct drm_crtc_state *state, struct drm_property *property,
 		uint64_t val)
 {
-	return 0;  // XXX
+	/* TODO any standard crtc props */
+	if (crtc->funcs->atomic_set_property)
+		return crtc->funcs->atomic_set_property(crtc, state, property, val);
+	return -EINVAL;
 }
-EXPORT_SYMBOL(drm_atomic_set_crtc_property);
+EXPORT_SYMBOL(drm_atomic_crtc_set_property);
 
 /**
+ * drm_atomic_crtc_get_property - get property on connector
  *
+ * Use this instead of calling crtc->atomic_get_property directly
  */
-int drm_atomic_get_crtc_property(struct drm_crtc *crtc,
+int drm_atomic_crtc_get_property(struct drm_crtc *crtc,
 		const struct drm_crtc_state *state,
 		struct drm_property *property, uint64_t *val)
 {
-	return 0;  // XXX
+	/* TODO any standard crtc props */
+	if (crtc->funcs->atomic_get_property)
+		return crtc->funcs->atomic_get_property(crtc, state, property, val);
+	return -EINVAL;
 }
-EXPORT_SYMBOL(drm_atomic_get_crtc_property);
+EXPORT_SYMBOL(drm_atomic_crtc_get_property);
 
 /**
  * drm_atomic_get_plane_state - get plane state
@@ -294,15 +304,16 @@ drm_atomic_get_plane_state(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_get_plane_state);
 
 /**
+ * drm_atomic_plane_set_property - set property on plane
  *
+ * Use this instead of calling plane->atomic_set_property directly
  */
-int drm_atomic_set_plane_property(struct drm_plane *plane,
+int drm_atomic_plane_set_property(struct drm_plane *plane,
 		struct drm_plane_state *state, struct drm_property *property,
 		uint64_t val)
 {
 	struct drm_device *dev = plane->dev;
 	struct drm_mode_config *config = &dev->mode_config;
-	int ret = 0;
 
 	if (property == config->prop_fb_id) {
 		struct drm_framebuffer *fb = drm_framebuffer_lookup(dev, val);
@@ -311,7 +322,7 @@ int drm_atomic_set_plane_property(struct drm_plane *plane,
 			drm_framebuffer_unreference(fb);
 	} else if (property == config->prop_crtc_id) {
 		struct drm_crtc *crtc = drm_crtc_find(dev, val);
-		ret = drm_atomic_set_crtc_for_plane(state->state, plane, crtc);
+		return drm_atomic_set_crtc_for_plane(state->state, plane, crtc);
 	} else if (property == config->prop_crtc_x) {
 		state->crtc_x = U642I64(val);
 	} else if (property == config->prop_crtc_y) {
@@ -328,18 +339,23 @@ int drm_atomic_set_plane_property(struct drm_plane *plane,
 		state->src_w = val;
 	} else if (property == config->prop_src_h) {
 		state->src_h = val;
+	} else if (plane->funcs->atomic_set_property) {
+		return plane->funcs->atomic_set_property(plane, state,
+				property, val);
 	} else {
-		ret = -EINVAL;
+		return -EINVAL;
 	}
 
-	return ret;
+	return 0;
 }
-EXPORT_SYMBOL(drm_atomic_set_plane_property);
+EXPORT_SYMBOL(drm_atomic_plane_set_property);
 
 /**
+ * drm_atomic_plane_get_property - get property on plane
  *
+ * Use this instead of calling plane->atomic_get_property directly
  */
-int drm_atomic_get_plane_property(struct drm_plane *plane,
+int drm_atomic_plane_get_property(struct drm_plane *plane,
 		const struct drm_plane_state *state,
 		struct drm_property *property, uint64_t *val)
 {
@@ -366,13 +382,15 @@ int drm_atomic_get_plane_property(struct drm_plane *plane,
 		*val = state->src_w;
 	} else if (property == config->prop_src_h) {
 		*val = state->src_h;
+	} else if (plane->funcs->atomic_get_property) {
+		return plane->funcs->atomic_get_property(plane, state, property, val);
 	} else {
 		return -EINVAL;
 	}
 
 	return 0;
 }
-EXPORT_SYMBOL(drm_atomic_get_plane_property);
+EXPORT_SYMBOL(drm_atomic_plane_get_property);
 
 /**
  * drm_atomic_get_connector_state - get connector state
@@ -446,37 +464,41 @@ drm_atomic_get_connector_state(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_get_connector_state);
 
 /**
+ * drm_atomic_connector_set_property - set property on connector.
  *
+ * Use this instead of calling connector->atomic_set_property directly
  */
-int drm_atomic_set_connector_property(struct drm_connector *connector,
+int drm_atomic_connector_set_property(struct drm_connector *connector,
 		struct drm_connector_state *state, struct drm_property *property,
 		uint64_t val)
 {
 	struct drm_device *dev = connector->dev;
 	struct drm_mode_config *config = &dev->mode_config;
-	int ret = 0;
 
 	if (property == config->prop_crtc_id) {
 		struct drm_crtc *crtc = drm_crtc_find(dev, val);
-		ret = drm_atomic_set_crtc_for_connector(state, crtc);
+		return drm_atomic_set_crtc_for_connector(state, crtc);
 	} else if (property == config->dpms_property) {
 		/* setting DPMS property requires special handling, which
 		 * is done in legacy setprop path for us.  Disallow (for
 		 * now?) atomic writes to DPMS property:
 		 */
-		ret = -EINVAL;
+		return -EINVAL;
+	} else if (connector->funcs->atomic_set_property) {
+		return connector->funcs->atomic_set_property(connector,
+				state, property, val);
 	} else {
-		ret = -EINVAL;
+		return -EINVAL;
 	}
-
-	return ret;
 }
-EXPORT_SYMBOL(drm_atomic_set_connector_property);
+EXPORT_SYMBOL(drm_atomic_connector_set_property);
 
 /**
+ * drm_atomic_connector_get_property - get property on connector
  *
+ * Use this instead of calling connector->atomic_get_property directly
  */
-int drm_atomic_get_connector_property(struct drm_connector *connector,
+int drm_atomic_connector_get_property(struct drm_connector *connector,
 		const struct drm_connector_state *state,
 		struct drm_property *property, uint64_t *val)
 {
@@ -487,13 +509,16 @@ int drm_atomic_get_connector_property(struct drm_connector *connector,
 		*val = (state->crtc) ? state->crtc->base.id : 0;
 	} else if (property == config->dpms_property) {
 		*val = connector->dpms;
+	} else if (connector->funcs->atomic_get_property) {
+		return connector->funcs->atomic_get_property(connector,
+				state, property, val);
 	} else {
 		return -EINVAL;
 	}
 
 	return 0;
 }
-EXPORT_SYMBOL(drm_atomic_get_connector_property);
+EXPORT_SYMBOL(drm_atomic_connector_get_property);
 
 /**
  * drm_atomic_set_crtc_for_plane - set crtc for plane

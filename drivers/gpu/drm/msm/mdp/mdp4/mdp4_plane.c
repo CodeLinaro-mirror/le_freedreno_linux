@@ -61,8 +61,6 @@ static const struct drm_plane_funcs mdp4_plane_funcs = {
 		.disable_plane = drm_atomic_helper_disable_plane,
 		.destroy = mdp4_plane_destroy,
 		.set_property = drm_atomic_helper_plane_set_property,
-		.atomic_set_property = drm_atomic_set_plane_property,
-		.atomic_get_property = drm_atomic_get_plane_property,
 		.reset = drm_atomic_helper_plane_reset,
 		.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
 		.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
@@ -91,7 +89,7 @@ static void mdp4_plane_cleanup_fb(struct drm_plane *plane,
 static int mdp4_plane_atomic_check(struct drm_plane *plane,
 		struct drm_plane_state *state)
 {
-	return drm_atomic_helper_plane_check(plane, state);
+	return 0;
 }
 
 static void mdp4_plane_atomic_update(struct drm_plane *plane,

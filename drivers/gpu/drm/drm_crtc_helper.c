@@ -953,13 +953,11 @@ int drm_helper_crtc_mode_set(struct drm_crtc *crtc, struct drm_display_mode *mod
 	drm_mode_copy(&crtc_state->mode, mode);
 	drm_mode_copy(&crtc_state->adjusted_mode, adjusted_mode);
 
-	if (crtc_funcs->atomic_check) {
-		ret = crtc_funcs->atomic_check(crtc, crtc_state);
-		if (ret) {
-			kfree(crtc_state);
+	ret = drm_atomic_helper_crtc_check(crtc, crtc_state);
+	if (ret) {
+		kfree(crtc_state);
 
-			return ret;
-		}
+		return ret;
 	}
 
 	swap(crtc->state, crtc_state);

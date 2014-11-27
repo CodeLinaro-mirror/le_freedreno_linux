@@ -429,21 +429,15 @@ int drm_atomic_helper_check(struct drm_device *dev,
 	int i, ret = 0;
 
 	for (i = 0; i < nplanes; i++) {
-		struct drm_plane_helper_funcs *funcs;
 		struct drm_plane *plane = state->planes[i];
 		struct drm_plane_state *plane_state = state->plane_states[i];
 
 		if (!plane)
 			continue;
 
-		funcs = plane->helper_private;
-
 		drm_atomic_helper_plane_changed(state, plane_state, plane);
 
-		if (!funcs || WARN_ON(!funcs->atomic_check))
-			continue;
-
-		ret = funcs->atomic_check(plane, plane_state);
+		ret = drm_atomic_helper_plane_check(plane, plane_state);
 		if (ret) {
 			DRM_DEBUG_KMS("[PLANE:%d] atomic check failed\n",
 				      plane->base.id);
@@ -452,18 +446,12 @@ int drm_atomic_helper_check(struct drm_device *dev,
 	}
 
 	for (i = 0; i < ncrtcs; i++) {
-		struct drm_crtc_helper_funcs *funcs;
 		struct drm_crtc *crtc = state->crtcs[i];
 
 		if (!crtc)
 			continue;
 
-		funcs = crtc->helper_private;
-
-		if (!funcs || WARN_ON(!funcs->atomic_check))
-			continue;
-
-		ret = funcs->atomic_check(crtc, state->crtc_states[i]);
+		ret = drm_atomic_helper_crtc_check(crtc, state->crtc_states[i]);
 		if (ret) {
 			DRM_DEBUG_KMS("[CRTC:%d] atomic check failed\n",
 				      crtc->base.id);
@@ -1558,8 +1546,8 @@ retry:
 		goto fail;
 	}
 
-	ret = crtc->funcs->atomic_set_property(crtc, crtc_state,
-					       property, val);
+	ret = drm_atomic_crtc_set_property(crtc, crtc_state,
+			property, val);
 	if (ret)
 		goto fail;
 
@@ -1617,8 +1605,8 @@ retry:
 		goto fail;
 	}
 
-	ret = plane->funcs->atomic_set_property(plane, plane_state,
-					       property, val);
+	ret = drm_atomic_plane_set_property(plane, plane_state,
+			property, val);
 	if (ret)
 		goto fail;
 
@@ -1676,8 +1664,8 @@ retry:
 		goto fail;
 	}
 
-	ret = connector->funcs->atomic_set_property(connector, connector_state,
-					       property, val);
+	ret = drm_atomic_connector_set_property(connector, connector_state,
+			property, val);
 	if (ret)
 		goto fail;
 
@@ -1801,21 +1789,21 @@ int atomic_helper_get_property(struct drm_mode_object *obj,
 	case DRM_MODE_OBJECT_CONNECTOR: {
 		struct drm_connector *connector = obj_to_connector(obj);
 		WARN_ON(!drm_modeset_is_locked(&dev->mode_config.connection_mutex));
-		ret = connector->funcs->atomic_get_property(connector,
+		ret = drm_atomic_connector_get_property(connector,
 				connector->state, property, val);
 		break;
 	}
 	case DRM_MODE_OBJECT_CRTC: {
 		struct drm_crtc *crtc = obj_to_crtc(obj);
 		WARN_ON(!drm_modeset_is_locked(&crtc->mutex));
-		ret = crtc->funcs->atomic_get_property(crtc,
+		ret = drm_atomic_crtc_get_property(crtc,
 				crtc->state, property, val);
 		break;
 	}
 	case DRM_MODE_OBJECT_PLANE: {
 		struct drm_plane *plane = obj_to_plane(obj);
 		WARN_ON(!drm_modeset_is_locked(&plane->mutex));
-		ret = plane->funcs->atomic_get_property(plane,
+		ret = drm_atomic_plane_get_property(plane,
 				plane->state, property, val);
 		break;
 	}
@@ -1901,15 +1889,23 @@ EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
 
 /**
  * blah blah blah
+ *
+ * Don't call crtc->atomic_check() directly
  */
 int drm_atomic_helper_crtc_check(struct drm_crtc *crtc,
 		struct drm_crtc_state *state)
 {
+	struct drm_crtc_helper_funcs *funcs = crtc->helper_private;
+
+	if (!funcs || WARN_ON(!funcs->atomic_check))
+		return 0;
+
 	/* TODO anything to check?  I think if drivers want to enforce that
 	 * primary layer covers entire screen, they should do that in their
 	 * own crtc->atomic_check() fxn..
 	 */
-	return 0;
+
+	return funcs->atomic_check(crtc, state);
 }
 EXPORT_SYMBOL(drm_atomic_helper_crtc_check);
 
@@ -1982,6 +1978,7 @@ EXPORT_SYMBOL(drm_atomic_helper_plane_destroy_state);
 int drm_atomic_helper_plane_check(struct drm_plane *plane,
 		struct drm_plane_state *state)
 {
+	struct drm_plane_helper_funcs *funcs = plane->helper_private;
 	unsigned int fb_width, fb_height;
 	unsigned int i;
 
@@ -2031,7 +2028,10 @@ int drm_atomic_helper_plane_check(struct drm_plane *plane,
 		return -ENOSPC;
 	}
 
-	return 0;
+	if (!funcs || WARN_ON(!funcs->atomic_check))
+		return 0;
+
+	return funcs->atomic_check(plane, state);
 }
 EXPORT_SYMBOL(drm_atomic_helper_plane_check);
 

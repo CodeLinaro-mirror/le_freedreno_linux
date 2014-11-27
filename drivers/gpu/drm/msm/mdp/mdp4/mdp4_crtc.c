@@ -332,8 +332,7 @@ static int mdp4_crtc_atomic_check(struct drm_crtc *crtc,
 {
 	struct mdp4_crtc *mdp4_crtc = to_mdp4_crtc(crtc);
 	DBG("%s: check", mdp4_crtc->name);
-	// TODO anything else to check?
-	return drm_atomic_helper_crtc_check(crtc, state);
+	return 0;
 }
 
 static void mdp4_crtc_atomic_begin(struct drm_crtc *crtc)
@@ -493,8 +492,6 @@ static const struct drm_crtc_funcs mdp4_crtc_funcs = {
 	.destroy = mdp4_crtc_destroy,
 	.page_flip = drm_atomic_helper_page_flip,
 	.set_property = drm_atomic_helper_crtc_set_property,
-	.atomic_set_property = drm_atomic_set_crtc_property,
-	.atomic_get_property = drm_atomic_get_crtc_property,
 	.cursor_set = mdp4_crtc_cursor_set,
 	.cursor_move = mdp4_crtc_cursor_move,
 	.reset = drm_atomic_helper_crtc_reset,
