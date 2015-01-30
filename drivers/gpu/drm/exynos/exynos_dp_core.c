@@ -18,7 +18,6 @@
 #include <linux/interrupt.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
-#include <linux/of_graph.h>
 #include <linux/gpio.h>
 #include <linux/component.h>
 #include <linux/phy/phy.h>
@@ -995,19 +994,9 @@ static struct drm_connector_helper_funcs exynos_dp_connector_helper_funcs = {
 };
 
 /* returns the number of bridges attached */
-static int exynos_drm_attach_lcd_bridge(struct exynos_dp_device *dp,
+static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
 		struct drm_encoder *encoder)
 {
-	int ret;
-
-	encoder->bridge = dp->bridge;
-	dp->bridge->encoder = encoder;
-	ret = drm_bridge_attach(encoder->dev, dp->bridge);
-	if (ret) {
-		DRM_ERROR("Failed to attach bridge to drm\n");
-		return ret;
-	}
-
 	return 0;
 }
 
@@ -1021,11 +1010,9 @@ static int exynos_dp_create_connector(struct exynos_drm_display *display,
 	dp->encoder = encoder;
 
 	/* Pre-empt DP connector creation if there's a bridge */
-	if (dp->bridge) {
-		ret = exynos_drm_attach_lcd_bridge(dp, encoder);
-		if (!ret)
-			return 0;
-	}
+	ret = exynos_drm_attach_lcd_bridge(dp->drm_dev, encoder);
+	if (ret)
+		return 0;
 
 	connector->polled = DRM_CONNECTOR_POLL_HPD;
 
@@ -1232,7 +1219,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
 		}
 	}
 
-	if (!dp->panel && !dp->bridge) {
+	if (!dp->panel) {
 		ret = exynos_dp_dt_parse_panel(dp);
 		if (ret)
 			return ret;
@@ -1316,7 +1303,7 @@ static const struct component_ops exynos_dp_ops = {
 static int exynos_dp_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct device_node *panel_node, *bridge_node, *endpoint;
+	struct device_node *panel_node;
 	struct exynos_dp_device *dp;
 	int ret;
 
@@ -1339,18 +1326,6 @@ static int exynos_dp_probe(struct platform_device *pdev)
 		dp->panel = of_drm_find_panel(panel_node);
 		of_node_put(panel_node);
 		if (!dp->panel)
-			return -EPROBE_DEFER;
-	}
-
-	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
-	if (endpoint) {
-		bridge_node = of_graph_get_remote_port_parent(endpoint);
-		if (bridge_node) {
-			dp->bridge = of_drm_find_bridge(bridge_node);
-			of_node_put(bridge_node);
-			if (!dp->bridge)
-				return -EPROBE_DEFER;
-		} else
 			return -EPROBE_DEFER;
 	}
 
