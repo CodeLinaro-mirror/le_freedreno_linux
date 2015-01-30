@@ -220,9 +220,8 @@ struct drm_bridge *hdmi_bridge_init(struct hdmi *hdmi)
 	hdmi_bridge->hdmi = hdmi;
 
 	bridge = &hdmi_bridge->base;
-	bridge->funcs = &hdmi_bridge_funcs;
 
-	drm_bridge_init(hdmi->dev, bridge);
+	drm_bridge_init(hdmi->dev, bridge, &hdmi_bridge_funcs);
 
 	return bridge;
 

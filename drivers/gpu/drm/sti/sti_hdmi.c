@@ -635,8 +635,7 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
 		goto err_adapt;
 
 	bridge->driver_private = hdmi;
-	bridge->funcs = &sti_hdmi_bridge_funcs;
-	drm_bridge_init(drm_dev, bridge);
+	drm_bridge_init(drm_dev, bridge, &sti_hdmi_bridge_funcs);
 
 	encoder->bridge = bridge;
 	connector->encoder = encoder;

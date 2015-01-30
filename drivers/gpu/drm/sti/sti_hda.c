@@ -664,8 +664,7 @@ static int sti_hda_bind(struct device *dev, struct device *master, void *data)
 		return -ENOMEM;
 
 	bridge->driver_private = hda;
-	bridge->funcs = &sti_hda_bridge_funcs;
-	drm_bridge_init(drm_dev, bridge);
+	drm_bridge_init(drm_dev, bridge, &sti_hda_bridge_funcs);
 
 	encoder->bridge = bridge;
 	connector->encoder = encoder;
