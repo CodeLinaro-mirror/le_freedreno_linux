@@ -146,7 +146,6 @@ void hdmi_audio_set_sample_rate(struct hdmi *hdmi, int rate);
  */
 
 struct drm_bridge *hdmi_bridge_init(struct hdmi *hdmi);
-void hdmi_bridge_destroy(struct drm_bridge *bridge);
 
 /*
  * hdmi connector:
