@@ -26,7 +26,6 @@ struct mdp5_encoder {
 	int intf;
 	enum mdp5_intf intf_id;
 	spinlock_t intf_lock;	/* protect REG_MDP5_INTF_* registers */
-	bool enabled;
 	uint32_t bsc;
 };
 #define to_mdp5_encoder(x) container_of(x, struct mdp5_encoder, base)
@@ -227,9 +226,6 @@ static void mdp5_encoder_disable(struct drm_encoder *encoder)
 	int intf = mdp5_encoder->intf;
 	unsigned long flags;
 
-	if (WARN_ON(!mdp5_encoder->enabled))
-		return;
-
 	spin_lock_irqsave(&mdp5_encoder->intf_lock, flags);
 	mdp5_write(mdp5_kms, REG_MDP5_INTF_TIMING_ENGINE_EN(intf), 0);
 	spin_unlock_irqrestore(&mdp5_encoder->intf_lock, flags);
@@ -245,8 +241,6 @@ static void mdp5_encoder_disable(struct drm_encoder *encoder)
 	mdp_irq_wait(&mdp5_kms->base, intf2vblank(intf));
 
 	bs_set(mdp5_encoder, 0);
-
-	mdp5_encoder->enabled = false;
 }
 
 static void mdp5_encoder_enable(struct drm_encoder *encoder)
@@ -256,9 +250,6 @@ static void mdp5_encoder_enable(struct drm_encoder *encoder)
 	int intf = mdp5_encoder->intf;
 	unsigned long flags;
 
-	if (WARN_ON(mdp5_encoder->enabled))
-		return;
-
 	mdp5_crtc_set_intf(encoder->crtc, mdp5_encoder->intf,
 			mdp5_encoder->intf_id);
 
@@ -266,8 +257,6 @@ static void mdp5_encoder_enable(struct drm_encoder *encoder)
 	spin_lock_irqsave(&mdp5_encoder->intf_lock, flags);
 	mdp5_write(mdp5_kms, REG_MDP5_INTF_TIMING_ENGINE_EN(intf), 1);
 	spin_unlock_irqrestore(&mdp5_encoder->intf_lock, flags);
-
-	mdp5_encoder->enabled = false;
 }
 
 static const struct drm_encoder_helper_funcs mdp5_encoder_helper_funcs = {

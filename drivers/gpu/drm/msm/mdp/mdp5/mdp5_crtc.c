@@ -33,7 +33,6 @@ struct mdp5_crtc {
 	struct drm_crtc base;
 	char name[8];
 	int id;
-	bool enabled;
 
 	/* layer mixer used for this CRTC (+ its lock): */
 #define GET_LM_ID(crtc_id)	((crtc_id == 3) ? 5 : crtc_id)
@@ -268,16 +267,11 @@ static void mdp5_crtc_disable(struct drm_crtc *crtc)
 
 	DBG("%s", mdp5_crtc->name);
 
-	if (WARN_ON(!mdp5_crtc->enabled))
-		return;
-
 	/* set STAGE_UNUSED for all layers */
 	mdp5_ctl_blend(mdp5_crtc->ctl, mdp5_crtc->lm, 0x00000000);
 
 	mdp_irq_unregister(&mdp5_kms->base, &mdp5_crtc->err);
 	mdp5_disable(mdp5_kms);
-
-	mdp5_crtc->enabled = false;
 }
 
 static void mdp5_crtc_enable(struct drm_crtc *crtc)
@@ -287,15 +281,10 @@ static void mdp5_crtc_enable(struct drm_crtc *crtc)
 
 	DBG("%s", mdp5_crtc->name);
 
-	if (WARN_ON(mdp5_crtc->enabled))
-		return;
-
 	mdp5_enable(mdp5_kms);
 	mdp_irq_register(&mdp5_kms->base, &mdp5_crtc->err);
 
 	crtc_flush_all(crtc);
-
-	mdp5_crtc->enabled = true;
 }
 
 struct plane_state {

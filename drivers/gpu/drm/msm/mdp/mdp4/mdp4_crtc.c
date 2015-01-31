@@ -28,7 +28,6 @@ struct mdp4_crtc {
 	int id;
 	int ovlp;
 	enum mdp4_dma dma;
-	bool enabled;
 
 	/* which mixer/encoder we route output to: */
 	int mixer;
@@ -291,13 +290,8 @@ static void mdp4_crtc_disable(struct drm_crtc *crtc)
 
 	DBG("%s", mdp4_crtc->name);
 
-	if (WARN_ON(!mdp4_crtc->enabled))
-		return;
-
 	mdp_irq_unregister(&mdp4_kms->base, &mdp4_crtc->err);
 	mdp4_disable(mdp4_kms);
-
-	mdp4_crtc->enabled = false;
 }
 
 static void mdp4_crtc_enable(struct drm_crtc *crtc)
@@ -307,15 +301,10 @@ static void mdp4_crtc_enable(struct drm_crtc *crtc)
 
 	DBG("%s", mdp4_crtc->name);
 
-	if (WARN_ON(mdp4_crtc->enabled))
-		return;
-
 	mdp4_enable(mdp4_kms);
 	mdp_irq_register(&mdp4_kms->base, &mdp4_crtc->err);
 
 	crtc_flush(crtc);
-
-	mdp4_crtc->enabled = true;
 }
 
 static int mdp4_crtc_atomic_check(struct drm_crtc *crtc,
