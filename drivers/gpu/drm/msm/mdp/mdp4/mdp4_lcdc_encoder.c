@@ -27,7 +27,6 @@ struct mdp4_lcdc_encoder {
 	struct clk *lcdc_clk;
 	unsigned long int pixclock;
 	struct regulator *regs[3];
-	bool enabled;
 	uint32_t bsc;
 };
 #define to_mdp4_lcdc_encoder(x) container_of(x, struct mdp4_lcdc_encoder, base)
@@ -341,9 +340,6 @@ static void mdp4_lcdc_encoder_disable(struct drm_encoder *encoder)
 	struct drm_panel *panel = mdp4_lcdc_encoder->panel;
 	int i, ret;
 
-	if (WARN_ON(!mdp4_lcdc_encoder->enabled))
-		return;
-
 	mdp4_write(mdp4_kms, REG_MDP4_LCDC_ENABLE, 0);
 
 	if (panel)
@@ -368,8 +364,6 @@ static void mdp4_lcdc_encoder_disable(struct drm_encoder *encoder)
 	}
 
 	bs_set(mdp4_lcdc_encoder, 0);
-
-	mdp4_lcdc_encoder->enabled = false;
 }
 
 static void mdp4_lcdc_encoder_enable(struct drm_encoder *encoder)
@@ -381,9 +375,6 @@ static void mdp4_lcdc_encoder_enable(struct drm_encoder *encoder)
 	struct mdp4_kms *mdp4_kms = get_kms(encoder);
 	struct drm_panel *panel = mdp4_lcdc_encoder->panel;
 	int i, ret;
-
-	if (WARN_ON(mdp4_lcdc_encoder->enabled))
-		return;
 
 	/* TODO: hard-coded for 18bpp: */
 	mdp4_crtc_set_config(encoder->crtc,
@@ -418,8 +409,6 @@ static void mdp4_lcdc_encoder_enable(struct drm_encoder *encoder)
 	setup_phy(encoder);
 
 	mdp4_write(mdp4_kms, REG_MDP4_LCDC_ENABLE, 1);
-
-	mdp4_lcdc_encoder->enabled = true;
 }
 
 static const struct drm_encoder_helper_funcs mdp4_lcdc_encoder_helper_funcs = {

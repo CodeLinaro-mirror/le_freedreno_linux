@@ -27,7 +27,6 @@ struct mdp4_dtv_encoder {
 	struct clk *hdmi_clk;
 	struct clk *mdp_clk;
 	unsigned long int pixclock;
-	bool enabled;
 	uint32_t bsc;
 };
 #define to_mdp4_dtv_encoder(x) container_of(x, struct mdp4_dtv_encoder, base)
@@ -171,9 +170,6 @@ static void mdp4_dtv_encoder_disable(struct drm_encoder *encoder)
 	struct mdp4_dtv_encoder *mdp4_dtv_encoder = to_mdp4_dtv_encoder(encoder);
 	struct mdp4_kms *mdp4_kms = get_kms(encoder);
 
-	if (WARN_ON(!mdp4_dtv_encoder->enabled))
-		return;
-
 	mdp4_write(mdp4_kms, REG_MDP4_DTV_ENABLE, 0);
 
 	/*
@@ -191,8 +187,6 @@ static void mdp4_dtv_encoder_disable(struct drm_encoder *encoder)
 	clk_disable_unprepare(mdp4_dtv_encoder->mdp_clk);
 
 	bs_set(mdp4_dtv_encoder, 0);
-
-	mdp4_dtv_encoder->enabled = false;
 }
 
 static void mdp4_dtv_encoder_enable(struct drm_encoder *encoder)
@@ -202,9 +196,6 @@ static void mdp4_dtv_encoder_enable(struct drm_encoder *encoder)
 	struct mdp4_kms *mdp4_kms = get_kms(encoder);
 	unsigned long pc = mdp4_dtv_encoder->pixclock;
 	int ret;
-
-	if (WARN_ON(mdp4_dtv_encoder->enabled))
-		return;
 
 	mdp4_crtc_set_config(encoder->crtc,
 			MDP4_DMA_CONFIG_R_BPC(BPC8) |
@@ -229,8 +220,6 @@ static void mdp4_dtv_encoder_enable(struct drm_encoder *encoder)
 		dev_err(dev->dev, "failed to enabled mdp_clk: %d\n", ret);
 
 	mdp4_write(mdp4_kms, REG_MDP4_DTV_ENABLE, 1);
-
-	mdp4_dtv_encoder->enabled = true;
 }
 
 static const struct drm_encoder_helper_funcs mdp4_dtv_encoder_helper_funcs = {
