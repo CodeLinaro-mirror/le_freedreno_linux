@@ -47,6 +47,7 @@ struct msm_edp {
 
 /* eDP bridge */
 struct drm_bridge *msm_edp_bridge_init(struct msm_edp *edp);
+void edp_bridge_destroy(struct drm_bridge *bridge);
 
 /* eDP connector */
 struct drm_connector *msm_edp_connector_init(struct msm_edp *edp);

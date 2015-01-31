@@ -19,13 +19,8 @@ struct edp_bridge {
 };
 #define to_edp_bridge(x) container_of(x, struct edp_bridge, base)
 
-static void edp_bridge_destroy(struct drm_bridge *bridge)
+void edp_bridge_destroy(struct drm_bridge *bridge)
 {
-	struct edp_bridge *edp_bridge = to_edp_bridge(bridge);
-
-	DBG("");
-	drm_bridge_cleanup(bridge);
-	kfree(edp_bridge);
 }
 
 static void edp_bridge_pre_enable(struct drm_bridge *bridge)
@@ -90,7 +85,6 @@ static const struct drm_bridge_funcs edp_bridge_funcs = {
 	.disable = edp_bridge_disable,
 	.post_disable = edp_bridge_post_disable,
 	.mode_set = edp_bridge_mode_set,
-	.destroy = edp_bridge_destroy,
 };
 
 /* initialize bridge */
@@ -100,7 +94,8 @@ struct drm_bridge *msm_edp_bridge_init(struct msm_edp *edp)
 	struct edp_bridge *edp_bridge;
 	int ret;
 
-	edp_bridge = kzalloc(sizeof(*edp_bridge), GFP_KERNEL);
+	edp_bridge = devm_kzalloc(edp->dev->dev,
+			sizeof(*edp_bridge), GFP_KERNEL);
 	if (!edp_bridge) {
 		ret = -ENOMEM;
 		goto fail;
@@ -109,8 +104,9 @@ struct drm_bridge *msm_edp_bridge_init(struct msm_edp *edp)
 	edp_bridge->edp = edp;
 
 	bridge = &edp_bridge->base;
+	bridge->funcs = &edp_bridge_funcs;
 
-	ret = drm_bridge_init(edp->dev, bridge, &edp_bridge_funcs);
+	ret = drm_bridge_attach(edp->dev, bridge);
 	if (ret)
 		goto fail;
 

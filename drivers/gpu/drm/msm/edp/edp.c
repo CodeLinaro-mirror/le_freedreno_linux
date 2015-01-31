@@ -196,7 +196,7 @@ int msm_edp_modeset_init(struct msm_edp *edp, struct drm_device *dev,
 fail:
 	/* bridge/connector are normally destroyed by drm */
 	if (edp->bridge) {
-		edp->bridge->funcs->destroy(edp->bridge);
+		edp_bridge_destroy(edp->bridge);
 		edp->bridge = NULL;
 	}
 	if (edp->connector) {
