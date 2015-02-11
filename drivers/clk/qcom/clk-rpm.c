@@ -1,54 +1,114 @@
-#include <linux/kernel.h>
-#include <linux/clk.h>
-#include <linux/err.h>
-#include <linux/platform_device.h>
+/* Copyright (c) 2010-2013 The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
 #include <linux/module.h>
+#include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/kernel.h>
+#include <linux/err.h>
+#include <linux/mutex.h>
+#include <linux/bug.h>
 #include <linux/clk-provider.h>
-#include <linux/mfd/qcom_rpm.h>
+
 #include <dt-bindings/mfd/qcom-rpm.h>
 
-struct rpm_cc {
-	struct clk_onecell_data data;
-	struct clk *clks[];
-};
+
+#include <linux/clk-provider.h>
+#include <linux/mfd/qcom_rpm.h>
+
+extern const struct clk_ops clk_ops_rpm;
+extern const struct clk_ops clk_ops_rpm_branch;
+
 struct rpm_clk {
-	const int rpm_clk_id;
 	struct qcom_rpm *rpm;
-	unsigned last_set_khz;
+	struct device *dev;
+	struct clk_hw hw;
+	int rpm_clk_id;
+	u32 rate;
+	bool active_only;
 	bool enabled;
 	bool branch; /* true: RPM only accepts 1 for ON and 0 for OFF */
-	unsigned factor;
-	struct clk_hw hw;
 };
 
 #define to_rpm_clk(_hw) container_of(_hw, struct rpm_clk, hw)
 
+static DEFINE_MUTEX(rpm_clk_lock);
+
+static int clk_rpm_set_active_rate(struct rpm_clk *r, u32 value)
+{
+	int ret = 0;
+	ret = qcom_rpm_write(r->rpm, QCOM_RPM_ACTIVE_STATE,
+				r->rpm_clk_id, &value, 1);
+
+	/* Upon success save newly set rate in Hz*/
+	if (ret == 0)
+		r->rate = value;
+
+	return ret;
+}
+
+static int clk_rpm_set_sleep_rate(struct rpm_clk *r, u32 value)
+{
+	return qcom_rpm_write(r->rpm, QCOM_RPM_SLEEP_STATE,
+				r->rpm_clk_id, &value, 1);
+}
+
+static void to_active_sleep_khz(struct rpm_clk *r, u32 rate,
+			u32 *active_khz, u32 *sleep_khz)
+{
+	/* Convert the rate (hz) to khz */
+	*active_khz = DIV_ROUND_UP(rate, 1000);
+
+	/*
+	 * Active-only clocks don't care what the rate is during sleep. So,
+	 * they vote for zero.
+	 */
+	if (r->active_only)
+		*sleep_khz = 0;
+	else
+		*sleep_khz = *active_khz;
+}
+
 static int rpm_clk_prepare(struct clk_hw *hw)
 {
 	struct rpm_clk *r = to_rpm_clk(hw);
-	uint32_t value;
 	int rc = 0;
-	unsigned long this_khz;
+	u32 this_khz, this_sleep_khz;
 
-	this_khz = r->last_set_khz;
-	/* Don't send requests to the RPM if the rate has not been set. */
-	if (r->last_set_khz == 0)
+	mutex_lock(&rpm_clk_lock);
+
+	/* Assume the clock is enabled if rate is not specified in DT */
+	if (r->rate == 0) {
+		r->enabled = true;
 		goto out;
+	}
 
-	value = this_khz;
-	if (r->branch)
-		value = !!value;
+	to_active_sleep_khz(r, r->rate, &this_khz, &this_sleep_khz);
 
-	rc = qcom_rpm_write(r->rpm, QCOM_RPM_ACTIVE_STATE,
-			    r->rpm_clk_id, &value, 1);
+	if (r->branch) {
+		this_khz = !!this_khz;
+		this_sleep_khz = !!this_sleep_khz;
+	}
+	rc = clk_rpm_set_active_rate(r, this_khz);
 	if (rc)
 		goto out;
 
-out:
+	rc = clk_rpm_set_sleep_rate(r, this_sleep_khz);
 	if (!rc)
 		r->enabled = true;
+out:
+	mutex_unlock(&rpm_clk_lock);
 	return rc;
 }
 
@@ -56,318 +116,165 @@ static void rpm_clk_unprepare(struct clk_hw *hw)
 {
 	struct rpm_clk *r = to_rpm_clk(hw);
 
-	if (r->last_set_khz) {
-		uint32_t value = 0;
-		int rc;
-
-		rc = qcom_rpm_write(r->rpm, QCOM_RPM_ACTIVE_STATE,
-			    r->rpm_clk_id, &value, 1);
-		if (rc)
-			return;
-
-	}
 	r->enabled = false;
+
+	return;
 }
 
-int rpm_clk_set_rate(struct clk_hw *hw,
-		     unsigned long rate, unsigned long prate)
+static int rpm_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+				unsigned long parent_rate)
 {
 	struct rpm_clk *r = to_rpm_clk(hw);
-	unsigned long this_khz;
-	int rc = 0;
+	u32 this_khz, this_sleep_khz;
+	int rc = -EPERM;
 
-	this_khz = DIV_ROUND_UP(rate, r->factor);
+	mutex_lock(&rpm_clk_lock);
+
+	to_active_sleep_khz(r, rate, &this_khz, &this_sleep_khz);
 
 	if (r->enabled) {
-		uint32_t value = this_khz;
-
-		rc = qcom_rpm_write(r->rpm, QCOM_RPM_ACTIVE_STATE,
-				    r->rpm_clk_id, &value, 1);
+		rc = clk_rpm_set_active_rate(r, this_khz);
 		if (rc)
 			goto out;
+
+		rc = clk_rpm_set_sleep_rate(r, this_sleep_khz);
 	}
-
-	if (!rc)
-		r->last_set_khz = this_khz;
-
 out:
+	mutex_unlock(&rpm_clk_lock);
 	return rc;
 }
 
+static unsigned long
+rpm_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+{
+	struct rpm_clk *r = to_rpm_clk(hw);
+
+	return r->rate;
+}
+
 static long rpm_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
-{
-	return rate;
-}
-
-static unsigned long rpm_clk_recalc_rate(struct clk_hw *hw,
-				unsigned long parent_rate)
-{
-	struct rpm_clk *r = to_rpm_clk(hw);
-	u32 val;
-	int rc;
-
-	rc = qcom_rpm_read(r->rpm, r->rpm_clk_id, &val, 1);
-	if (rc < 0)
-		return 0;
-
-	return val * r->factor;
-}
-
-static unsigned long rpm_branch_clk_recalc_rate(struct clk_hw *hw,
-				unsigned long parent_rate)
+				 unsigned long *p_rate)
 {
 	struct rpm_clk *r = to_rpm_clk(hw);
 
-	return r->last_set_khz * r->factor;
+	return r->rate;
 }
 
-static const struct clk_ops branch_clk_ops_rpm = {
-	.prepare	= rpm_clk_prepare,
-	.unprepare	= rpm_clk_unprepare,
-	.recalc_rate	= rpm_branch_clk_recalc_rate,
-	.round_rate	= rpm_clk_round_rate,
+const struct clk_ops clk_rpm_ops = {
+	.prepare = rpm_clk_prepare,
+	.unprepare = rpm_clk_unprepare,
+	.set_rate = rpm_clk_set_rate,
+	.recalc_rate = rpm_clk_recalc_rate,
+	.round_rate = rpm_clk_round_rate,
 };
 
-static const struct clk_ops clk_ops_rpm = {
-	.prepare	= rpm_clk_prepare,
-	.unprepare	= rpm_clk_unprepare,
-	.set_rate	= rpm_clk_set_rate,
-	.recalc_rate	= rpm_clk_recalc_rate,
-	.round_rate	= rpm_clk_round_rate,
+const struct clk_ops clk_rpm_branch_ops = {
+	.prepare = rpm_clk_prepare,
+	.unprepare = rpm_clk_unprepare,
+	.recalc_rate = rpm_clk_recalc_rate,
+	.round_rate = rpm_clk_round_rate,
 };
 
-static struct rpm_clk pxo_clk = {
-	.rpm_clk_id = QCOM_RPM_PXO_CLK,
-	.branch	= true,
-	.factor = 1000,
-	.last_set_khz = 27000,
-	.hw.init = &(struct clk_init_data){
-		.name = "pxo",
-		.ops = &branch_clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk cxo_clk = {
-	.rpm_clk_id = QCOM_RPM_CXO_CLK,
-	.branch	= true,
-	.factor = 1000,
-	.last_set_khz = 19200,
-	.hw.init = &(struct clk_init_data){
-		.name = "cxo",
-		.ops = &branch_clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk afab_clk = {
-	.rpm_clk_id = QCOM_RPM_APPS_FABRIC_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "afab_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk cfpb_clk = {
-	.rpm_clk_id = QCOM_RPM_CFPB_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "cfpb_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk daytona_clk = {
-	.rpm_clk_id = QCOM_RPM_DAYTONA_FABRIC_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "daytona_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk ebi1_clk = {
-	.rpm_clk_id = QCOM_RPM_EBI1_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "ebi1_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk mmfab_clk = {
-	.rpm_clk_id = QCOM_RPM_MM_FABRIC_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "mmfab_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk mmfpb_clk = {
-	.rpm_clk_id = QCOM_RPM_MMFPB_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "mmfpb_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk sfab_clk = {
-	.rpm_clk_id = QCOM_RPM_SYS_FABRIC_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "sfab_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-static struct rpm_clk sfpb_clk = {
-	.rpm_clk_id = QCOM_RPM_SFPB_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "sfpb_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-
-/*
-static struct rpm_clk qdss_clk = {
-	.rpm_clk_id = QCOM_RPM_QDSS_CLK,
-	.factor = 1000,
-	.hw.init = &(struct clk_init_data){
-		.name = "qdss_clk",
-		.ops = &clk_ops_rpm,
-	},
-};
-*/
-
-struct rpm_clk *rpm_clks[] = {
-	[QCOM_RPM_PXO_CLK] = &pxo_clk,
-	[QCOM_RPM_CXO_CLK] = &cxo_clk,
-	[QCOM_RPM_APPS_FABRIC_CLK] = &afab_clk,
-	[QCOM_RPM_CFPB_CLK] = &cfpb_clk,
-	[QCOM_RPM_DAYTONA_FABRIC_CLK] = &daytona_clk,
-	[QCOM_RPM_EBI1_CLK] = &ebi1_clk,
-	[QCOM_RPM_MM_FABRIC_CLK] = &mmfab_clk,
-	[QCOM_RPM_MMFPB_CLK] = &mmfpb_clk,
-	[QCOM_RPM_SYS_FABRIC_CLK] = &sfab_clk,
-	[QCOM_RPM_SFPB_CLK] = &sfpb_clk,
-/**	[QCOM_RPM_QDSS_CLK] = &qdss_clk, Needs more checking here **/
+static const struct of_device_id clk_rpm_of_match[] = {
+	{ .compatible = "qcom,rpm-clk", },
+	{ },
 };
 
 static int rpm_clk_probe(struct platform_device *pdev)
 {
-	struct clk **clks;
-	struct clk *clk;
-	struct rpm_cc *cc;
-	struct qcom_rpm *rpm;
-	int num_clks = ARRAY_SIZE(rpm_clks);
-	struct clk_onecell_data *data;
-	int i;
+	struct device *dev = &pdev->dev;
+	const struct of_device_id *match;
+	struct rpm_clk *clk;
+	struct clk *clock;
+	u32 val;
+	int ret;
 
-	if (!pdev->dev.of_node)
+	struct clk_init_data init;
+
+	match = of_match_device(clk_rpm_of_match, &pdev->dev);
+	if (!match)
 		return -ENODEV;
 
-	cc = devm_kzalloc(&pdev->dev, sizeof(*cc) + sizeof(*clks) * num_clks,
-			  GFP_KERNEL);
-	if (!cc)
+	clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
+	if (!clk) {
+		dev_err(&pdev->dev, "failed to allocate memory\n");
 		return -ENOMEM;
+	}
 
-	clks = cc->clks;
-	data = &cc->data;
-	data->clks = clks;
-	data->clk_num = num_clks;
-
-	rpm = dev_get_drvdata(pdev->dev.parent);
-	if (!rpm) {
+	clk->dev = &pdev->dev;
+	clk->rpm = dev_get_drvdata(pdev->dev.parent);
+	if (!clk->rpm) {
 		dev_err(&pdev->dev, "unable to retrieve handle to rpm\n");
 		return -ENODEV;
 	}
 
-	for (i = 0; i < num_clks; i++) {
-		if (!rpm_clks[i]) {
-			clks[i] = ERR_PTR(-ENOENT);
-			continue;
-		}
-		rpm_clks[i]->rpm = rpm;
-		clk = devm_clk_register(&pdev->dev, &rpm_clks[i]->hw);
-		if (IS_ERR(clk))
-			return PTR_ERR(clk);
+	/* load clock info from dts */
+	ret = of_property_read_u32(pdev->dev.of_node, "reg", &val);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to read reg.\n");
+		return ret;
+	}
+	clk->rpm_clk_id = val;
 
-		clks[i] = clk;
+	ret = of_property_read_string(pdev->dev.of_node,
+				"qcom,rpm-clk-name", &init.name);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to read qcom,rpm-clk-name\n");
+		return ret;
+	}
+	init.ops = &clk_rpm_ops;
+	init.flags = CLK_IS_ROOT;
+	init.parent_names = NULL;
+	init.num_parents =  0;
+	clk->hw.init = &init;
+
+	ret = of_property_read_u32(pdev->dev.of_node,
+			"qcom,rpm-clk-freq", &val);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "failed to read qcom,rpm-clk-freq\n");
+		return ret;
+	}
+	clk->rate = val;
+
+	clk->branch = of_property_read_bool(pdev->dev.of_node,
+				"qcom,rpm-clk-branch");
+
+	clk->active_only = of_property_read_bool(pdev->dev.of_node,
+				"qcom,rpm-clk-active-only");
+
+	clock = clk_register(dev, &clk->hw);
+	if (IS_ERR(clock))
+		return PTR_ERR(clock);
+
+	ret = rpm_clk_prepare(&clk->hw);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "failed to prepare %d\n", clk->rpm_clk_id);
+		return ret;
 	}
 
-	return of_clk_add_provider(pdev->dev.of_node, of_clk_src_onecell_get,
-				    data);
-}
-
-static int rpm_clk_remove(struct platform_device *pdev)
-{
-	of_clk_del_provider(pdev->dev.of_node);
 	return 0;
 }
-
-static const struct of_device_id rpm_clk_of_match[] = {
-	{ .compatible = "qcom,apq8064-rpm-clk" },
-	{ },
-};
 
 static struct platform_driver rpm_clk_driver = {
-	.driver = {
-		.name = "qcom-rpm-clk",
-		.of_match_table = rpm_clk_of_match,
+	.probe		= rpm_clk_probe,
+	.driver		= {
+		.name	= "qcom-rpm-clk",
+		.owner	= THIS_MODULE,
+		.of_match_table = of_match_ptr(clk_rpm_of_match),
 	},
-	.probe = rpm_clk_probe,
-	.remove = rpm_clk_remove,
-};
-
-/* dummy handoff clk handling... */
-static int rpm_clk_ho_probe(struct platform_device *pdev)
-{
-	int i, max_clks;
-	struct clk *clk;
-	max_clks = of_count_phandle_with_args(pdev->dev.of_node,
-					      "clocks", "#clock-cells");
-
-	for (i = 0; i < max_clks; i++)	{
-		clk = of_clk_get(pdev->dev.of_node, i);
-
-		if (IS_ERR(clk))
-			break;
-
-		clk_prepare_enable(clk);
-	}
-	return 0;
-}
-
-static const struct of_device_id rpm_clk_ho_of_match[] = {
-	{ .compatible = "qcom,apq8064-rpmcc-handoff" },
-	{ },
-};
-
-static struct platform_driver rpm_clk_ho_driver = {
-	.driver = {
-		.name = "qcom-rpm-clk-handoff",
-		.of_match_table = rpm_clk_ho_of_match,
-	},
-	.probe = rpm_clk_ho_probe,
 };
 
 static int __init rpm_clk_init(void)
 {
-	platform_driver_register(&rpm_clk_driver);
-	return platform_driver_register(&rpm_clk_ho_driver);
+	return platform_driver_register(&rpm_clk_driver);
 }
-subsys_initcall(rpm_clk_init);
+core_initcall(rpm_clk_init);
 
 static void __exit rpm_clk_exit(void)
 {
-	platform_driver_unregister(&rpm_clk_ho_driver);
 	platform_driver_unregister(&rpm_clk_driver);
 }
-module_exit(rpm_clk_exit)
+module_exit(rpm_clk_exit);
 
+MODULE_DESCRIPTION("QCOM RPM CLOCK Driver");
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org>");
-MODULE_DESCRIPTION("Driver for the RPM clocks");
