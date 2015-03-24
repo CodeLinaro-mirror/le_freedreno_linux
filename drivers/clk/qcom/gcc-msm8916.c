@@ -981,15 +981,21 @@ static struct clk_rcg2 gp3_clk_src = {
 	},
 };
 
+static struct freq_tbl ftbl_gcc_mdss_byte0_clk[] = {
+	{ .src = P_DSI0_PHYPLL_BYTE },
+	{ }
+};
+
 static struct clk_rcg2 byte0_clk_src = {
 	.cmd_rcgr = 0x4d044,
 	.hid_width = 5,
 	.parent_map = gcc_xo_gpll0a_dsibyte_map,
+	.freq_tbl = ftbl_gcc_mdss_byte0_clk,
 	.clkr.hw.init = &(struct clk_init_data){
 		.name = "byte0_clk_src",
 		.parent_names = gcc_xo_gpll0a_dsibyte,
 		.num_parents = 3,
-		.ops = &clk_byte2_ops,
+		.ops = &clk_byte_ops,
 		.flags = CLK_SET_RATE_PARENT,
 	},
 };
@@ -1037,11 +1043,17 @@ static struct clk_rcg2 mdp_clk_src = {
 	},
 };
 
+static struct freq_tbl ftbl_gcc_mdss_pclk[] = {
+	{ .src = P_DSI0_PHYPLL_DSI },
+	{ }
+};
+
 static struct clk_rcg2 pclk0_clk_src = {
 	.cmd_rcgr = 0x4d000,
 	.mnd_width = 8,
 	.hid_width = 5,
 	.parent_map = gcc_xo_gpll0a_dsiphy_map,
+	.freq_tbl = ftbl_gcc_mdss_pclk,
 	.clkr.hw.init = &(struct clk_init_data){
 		.name = "pclk0_clk_src",
 		.parent_names = gcc_xo_gpll0a_dsiphy,
@@ -1263,7 +1275,6 @@ static const struct freq_tbl ftbl_gcc_ultaudio_lpaif_i2s_clk[] = {
 	F(768000, P_XO, 5, 1, 5),
 	F(800000, P_XO, 5, 5, 24),
 	F(1024000, P_GPLL1, 14, 1, 63),
-	F(1152000, P_XO, 1, 3, 50),
 	F(1411200, P_GPLL1, 16, 1, 40),
 	F(1536000, P_XO, 1, 2, 25),
 	F(1600000, P_XO, 12, 0, 0),
@@ -3336,9 +3347,6 @@ MODULE_DEVICE_TABLE(of, gcc_msm8916_match_table);
 
 static int gcc_msm8916_probe(struct platform_device *pdev)
 {
-	struct clk *clk;
-	struct device *dev = &pdev->dev;
-
 	if (1) {
 		/* HACK: set CPUs to 533mhz */
 		void *rcg = devm_ioremap(&pdev->dev, 0x0b011050, 0x8);
@@ -3346,17 +3354,6 @@ static int gcc_msm8916_probe(struct platform_device *pdev)
 		writel(0x1, rcg);
 		udelay(500);
 	}
-
-	/* Temporary until RPM clocks supported */
-	clk = clk_register_fixed_rate(dev, "xo", NULL, CLK_IS_ROOT, 19200000);
-	if (IS_ERR(clk))
-		return PTR_ERR(clk);
-
-	clk = clk_register_fixed_rate(dev, "sleep_clk_src", NULL,
-				      CLK_IS_ROOT, 32768);
-	if (IS_ERR(clk))
-		return PTR_ERR(clk);
-
 	return qcom_cc_probe(pdev, &gcc_msm8916_desc);
 }
 
