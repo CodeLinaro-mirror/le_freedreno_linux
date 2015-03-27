@@ -5596,6 +5596,7 @@ struct drm_tile_group *drm_mode_get_tile_group(struct drm_device *dev,
 	mutex_unlock(&dev->mode_config.idr_mutex);
 	return NULL;
 }
+EXPORT_SYMBOL(drm_mode_get_tile_group);
 
 /**
  * drm_mode_create_tile_group - create a tile group from a displayid description
@@ -5634,3 +5635,4 @@ struct drm_tile_group *drm_mode_create_tile_group(struct drm_device *dev,
 	mutex_unlock(&dev->mode_config.idr_mutex);
 	return tg;
 }
+EXPORT_SYMBOL(drm_mode_create_tile_group);
