@@ -172,6 +172,7 @@
 #define GCC_CODEC_DIGCODEC_CLK			155
 #define GCC_BIMC_GFX_CLK			156
 #define GCC_BIMC_GPU_CLK			157
+#define GCC_BIMC_GPU_CLK_SRC			158
 
 /* Indexes for GDSCs */
 #define BIMC_GDSC				0

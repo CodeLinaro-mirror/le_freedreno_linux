@@ -3203,8 +3203,9 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
 	[GCC_ULTAUDIO_LPAIF_SEC_I2S_CLK] = &gcc_ultaudio_lpaif_sec_i2s_clk.clkr,
 	[GCC_ULTAUDIO_LPAIF_AUX_I2S_CLK] = &gcc_ultaudio_lpaif_aux_i2s_clk.clkr,
 	[GCC_CODEC_DIGCODEC_CLK] = &gcc_codec_digcodec_clk.clkr,
-	[GCC_BIMC_GFX_CLK] = gcc_bimc_gfx_clk.clkr,
-	[GCC_BIMC_GPU_CLK] = gcc_bimc_gpu_clk.clkr,
+	[GCC_BIMC_GFX_CLK] = &gcc_bimc_gfx_clk.clkr,
+	[GCC_BIMC_GPU_CLK] = &gcc_bimc_gpu_clk.clkr,
+	[GCC_BIMC_GPU_CLK_SRC] = &bimc_gpu_clk_src.clkr,
 };
 
 static struct gdsc *gcc_msm8916_gdscs[] = {
