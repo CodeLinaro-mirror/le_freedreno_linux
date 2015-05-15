@@ -174,6 +174,10 @@
 #define GCC_BIMC_GPU_CLK			157
 #define GCC_BIMC_GPU_CLK_SRC			158
 
+/* hack: */
+#define BIMC_DDR_CLK_SRC                       159
+#define GCC_BIMC_CLK                           160
+
 /* Indexes for GDSCs */
 #define BIMC_GDSC				0
 #define VENUS_GDSC				1

@@ -52,7 +52,16 @@ static void bs_set(struct msm_gpu *gpu, int idx)
 #else
 static void bs_init(struct msm_gpu *gpu) {}
 static void bs_fini(struct msm_gpu *gpu) {}
-static void bs_set(struct msm_gpu *gpu, int idx) {}
+static struct platform_device *gpu_pdev;
+static void bs_set(struct msm_gpu *gpu, int idx)
+{
+	static struct clk *ddr_clk = NULL;
+	if (!ddr_clk) {
+		ddr_clk = devm_clk_get(&gpu_pdev->dev, "ddr_clk");
+		clk_set_rate(ddr_clk, 800000000);
+		clk_prepare_enable(ddr_clk);
+	}
+}
 #endif
 
 static int enable_pwrrail(struct msm_gpu *gpu)
@@ -138,8 +147,8 @@ static int enable_axi(struct msm_gpu *gpu)
 {
 	if (gpu->ebi1_clk)
 		clk_prepare_enable(gpu->ebi1_clk);
-	if (gpu->bus_freq)
-		bs_set(gpu, gpu->bus_freq);
+//	if (gpu->bus_freq)
+		bs_set(gpu, 1);
 	return 0;
 }
 
@@ -147,7 +156,7 @@ static int disable_axi(struct msm_gpu *gpu)
 {
 	if (gpu->ebi1_clk)
 		clk_disable_unprepare(gpu->ebi1_clk);
-	if (gpu->bus_freq)
+//	if (gpu->bus_freq)
 		bs_set(gpu, 0);
 	return 0;
 }
@@ -535,6 +544,7 @@ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 	if (WARN_ON(gpu->num_perfcntrs > ARRAY_SIZE(gpu->last_cntrs)))
 		gpu->num_perfcntrs = ARRAY_SIZE(gpu->last_cntrs);
 
+gpu_pdev = pdev;
 	gpu->dev = drm;
 	gpu->funcs = funcs;
 	gpu->name = name;

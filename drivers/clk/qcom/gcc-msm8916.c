@@ -2752,6 +2752,49 @@ static struct clk_branch gcc_sdcc2_apps_clk = {
 	},
 };
 
+static const struct freq_tbl ftbl_bimc_ddr_clk[] = {
+	F(19200000, P_XO, 1, 0, 0),
+	F(100000000, P_GPLL0, 8, 0, 0),
+	F(200000000, P_GPLL0, 4, 0, 0),
+	F(266500000, P_BIMC, 4, 0, 0),
+	F(400000000, P_GPLL0, 2, 0, 0),
+	F(533000000, P_BIMC, 2, 0, 0),
+	F(800000000, P_GPLL0, 1, 0, 0),
+	F(1066000000, P_BIMC, 1, 0, 0),
+	{ }
+};
+
+static struct clk_rcg2 bimc_ddr_clk_src = {
+	.cmd_rcgr = 0x32004,
+	.hid_width = 5,
+	.parent_map = gcc_xo_gpll0_bimc_map,
+	.freq_tbl = ftbl_bimc_ddr_clk,
+	.clkr.hw.init = &(struct clk_init_data){
+		.name = "bimc_ddr_clk_src",
+		.parent_names = gcc_xo_gpll0_bimc,
+		.num_parents = 3,
+		.ops = &clk_rcg2_ops,
+		.flags = CLK_GET_RATE_NOCACHE,
+	},
+};
+
+static struct clk_branch gcc_bimc_clk = {
+	.halt_reg = 0x3101c,
+	.clkr = {
+		.enable_reg = 0x3101c,
+		.enable_mask = BIT(0),
+		.hw.init = &(struct clk_init_data){
+			.name = "gcc_bimc_clk",
+			.parent_names = (const char *[]){
+				"bimc_ddr_clk_src",
+			},
+			.num_parents = 1,
+			.flags = CLK_IGNORE_UNUSED | CLK_GET_RATE_NOCACHE,
+			.ops = &clk_branch2_ops,
+		},
+	},
+};
+
 static struct clk_branch gcc_apss_tcu_clk = {
 	.halt_reg = 0x12018,
 	.clkr = {
@@ -3218,6 +3261,8 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
 	[GCC_BIMC_GFX_CLK] = &gcc_bimc_gfx_clk.clkr,
 	[GCC_BIMC_GPU_CLK] = &gcc_bimc_gpu_clk.clkr,
 	[GCC_BIMC_GPU_CLK_SRC] = &bimc_gpu_clk_src.clkr,
+	[BIMC_DDR_CLK_SRC] = &bimc_ddr_clk_src.clkr,
+	[GCC_BIMC_CLK] = &gcc_bimc_clk.clkr,
 };
 
 static struct gdsc *gcc_msm8916_gdscs[] = {

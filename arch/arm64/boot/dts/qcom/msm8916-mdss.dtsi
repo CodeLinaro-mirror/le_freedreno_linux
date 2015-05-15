@@ -24,14 +24,16 @@
 		    "mem_clk",
 		    "mem_iface_clk",
 		    "alt_mem_iface_clk",
-		    "gfx3d_clk_src";
+		    "gfx3d_clk_src",
+		    "ddr_clk";
 		clocks =
 		    <&gcc GCC_OXILI_GFX3D_CLK>,
 		    <&gcc GCC_OXILI_AHB_CLK>,
 		    <&gcc GCC_OXILI_GMEM_CLK>,
 		    <&gcc GCC_BIMC_GFX_CLK>,
 		    <&gcc GCC_BIMC_GPU_CLK>,
-		    <&gcc GFX3D_CLK_SRC>;
+		    <&gcc GFX3D_CLK_SRC>,
+		    <&rpmcc RPM_BIMC_A_CLK>;
 		power-domains = <&gcc OXILI_GDSC>;
 		qcom,chipid = <0x03000600>;
 		qcom,gpu-pwrlevels {
