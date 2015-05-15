@@ -21,6 +21,7 @@
 #include <linux/clk-provider.h>
 #include <linux/regmap.h>
 #include <linux/reset-controller.h>
+#include <linux/delay.h>
 
 #include <dt-bindings/clock/qcom,gcc-msm8916.h>
 #include <dt-bindings/reset/qcom,gcc-msm8916.h>
@@ -3337,6 +3338,14 @@ static int gcc_msm8916_probe(struct platform_device *pdev)
 {
 	struct clk *clk;
 	struct device *dev = &pdev->dev;
+
+	if (1) {
+		/* HACK: set CPUs to 533mhz */
+		void *rcg = devm_ioremap(&pdev->dev, 0x0b011050, 0x8);
+		writel(0x402, rcg + 4);
+		writel(0x1, rcg);
+		udelay(500);
+	}
 
 	/* Temporary until RPM clocks supported */
 	clk = clk_register_fixed_rate(dev, "xo", NULL, CLK_IS_ROOT, 19200000);
