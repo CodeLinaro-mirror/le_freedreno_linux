@@ -117,6 +117,12 @@ struct drm_fb_helper_connector {
  * @pseudo_palette: fake palette of 16 colors
  * @kernel_fb_list: list_head in kernel_fb_helper_list
  * @delayed_hotplug: was there a hotplug while kms master active?
+ * @atomic: use atomic updates for restore_fbdev_mode(), etc.  This
+ *          defaults to true if driver has DRIVER_ATOMIC feature
+ *          flag, but drivers can override it to true after
+ *          drm_fb_helper_init() if they support atomic modeset
+ *          but do not yet advertise DRIVER_ATOMIC (note that
+ *          fb-helper does not require ASYNC commits).
  */
 struct drm_fb_helper {
 	struct drm_framebuffer *fb;
@@ -134,6 +140,8 @@ struct drm_fb_helper {
 	/* we got a hotplug but fbdev wasn't running the console
 	   delay until next set_par */
 	bool delayed_hotplug;
+
+	bool atomic;
 };
 
 #ifdef CONFIG_DRM_FBDEV_EMULATION
