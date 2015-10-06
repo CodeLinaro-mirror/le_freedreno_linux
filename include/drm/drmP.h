@@ -125,6 +125,7 @@ struct dma_buf_attachment;
 #define DRM_UT_KMS		0x04
 #define DRM_UT_PRIME		0x08
 #define DRM_UT_ATOMIC		0x10
+#define DRM_UT_DPCD		0x20
 
 extern __printf(2, 3)
 void drm_ut_debug_printk(const char *function_name,
@@ -215,6 +216,11 @@ void drm_err(const char *format, ...);
 #define DRM_DEBUG_ATOMIC(fmt, args...)					\
 	do {								\
 		if (unlikely(drm_debug & DRM_UT_ATOMIC))		\
+			drm_ut_debug_printk(__func__, fmt, ##args);	\
+	} while (0)
+#define DRM_DEBUG_DPCD(fmt, args...)					\
+	do {								\
+		if (unlikely(drm_debug & DRM_UT_DPCD))			\
 			drm_ut_debug_printk(__func__, fmt, ##args);	\
 	} while (0)
 
