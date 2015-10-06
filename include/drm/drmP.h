@@ -110,6 +110,8 @@ struct dma_buf_attachment;
  * VBL: used for verbose debug message in the vblank code
  *	  This is the category used by the DRM_DEBUG_VBL() macro.
  *
+ * DPCD: used to log (displayport) DPCD messages
+ *
  * Enabling verbose debug messages is done through the drm.debug parameter,
  * each category being enabled by a bit.
  *
@@ -117,7 +119,7 @@ struct dma_buf_attachment;
  * drm.debug=0x2 will enable DRIVER messages
  * drm.debug=0x3 will enable CORE and DRIVER messages
  * ...
- * drm.debug=0x3f will enable all messages
+ * drm.debug=0x7f will enable all messages
  *
  * An interesting feature is that it's possible to enable verbose logging at
  * run-time by echoing the debug value in its sysfs node:
@@ -129,6 +131,7 @@ struct dma_buf_attachment;
 #define DRM_UT_PRIME		0x08
 #define DRM_UT_ATOMIC		0x10
 #define DRM_UT_VBL		0x20
+#define DRM_UT_DPCD		0x40
 
 extern __printf(2, 3)
 void drm_ut_debug_printk(const char *function_name,
@@ -224,6 +227,11 @@ void drm_err(const char *format, ...);
 #define DRM_DEBUG_VBL(fmt, args...)					\
 	do {								\
 		if (unlikely(drm_debug & DRM_UT_VBL))			\
+			drm_ut_debug_printk(__func__, fmt, ##args);	\
+	} while (0)
+#define DRM_DEBUG_DPCD(fmt, args...)					\
+	do {								\
+		if (unlikely(drm_debug & DRM_UT_DPCD))			\
 			drm_ut_debug_printk(__func__, fmt, ##args);	\
 	} while (0)
 

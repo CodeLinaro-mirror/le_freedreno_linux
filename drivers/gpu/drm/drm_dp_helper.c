@@ -159,6 +159,44 @@ int drm_dp_bw_code_to_link_rate(u8 link_bw)
 }
 EXPORT_SYMBOL(drm_dp_bw_code_to_link_rate);
 
+static ssize_t aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
+{
+	ssize_t ret;
+
+	DRM_DEBUG_DPCD("%s: req=0x%02x, address=0x%05x, size=%zu\n", aux->name,
+			msg->request, msg->address, msg->size);
+
+	if (unlikely(drm_debug & DRM_UT_DPCD)) {
+		switch (msg->request & ~DP_AUX_I2C_MOT) {
+		case DP_AUX_NATIVE_WRITE:
+		case DP_AUX_I2C_WRITE:
+			print_hex_dump(KERN_DEBUG, "DPCD: ", DUMP_PREFIX_OFFSET,
+					16, 1, msg->buffer, msg->size, false);
+			break;
+		default:
+			break;
+		}
+	}
+
+	ret = aux->transfer(aux, msg);
+
+	DRM_DEBUG_DPCD("%s: reply=0x%02x, size=%zd\n", aux->name, msg->reply, ret);
+
+	if (unlikely(drm_debug & DRM_UT_DPCD) && (ret > 0)) {
+		switch (msg->request & ~DP_AUX_I2C_MOT) {
+		case DP_AUX_NATIVE_READ:
+		case DP_AUX_I2C_READ:
+			print_hex_dump(KERN_DEBUG, "DPCD: ", DUMP_PREFIX_OFFSET,
+					16, 1, msg->buffer, ret, false);
+			break;
+		default:
+			break;
+		}
+	}
+
+	return ret;
+}
+
 #define AUX_RETRY_INTERVAL 500 /* us */
 
 /**
@@ -196,7 +234,7 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 	 */
 	for (retry = 0; retry < 32; retry++) {
 
-		err = aux->transfer(aux, &msg);
+		err = aux_transfer(aux, &msg);
 		if (err < 0) {
 			if (err == -EBUSY)
 				continue;
@@ -212,16 +250,18 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 			goto unlock;
 
 		case DP_AUX_NATIVE_REPLY_NACK:
+			DRM_DEBUG_DPCD("native nack (result=%d, size=%zu)\n", err, msg.size);
 			err = -EIO;
 			goto unlock;
 
 		case DP_AUX_NATIVE_REPLY_DEFER:
+			DRM_DEBUG_DPCD("native defer\n");
 			usleep_range(AUX_RETRY_INTERVAL, AUX_RETRY_INTERVAL + 100);
 			break;
 		}
 	}
 
-	DRM_DEBUG_KMS("too many retries, giving up\n");
+	DRM_ERROR("DPCD: too many retries, giving up!\n");
 	err = -EIO;
 
 unlock:
@@ -550,12 +590,12 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 	WARN_ON(!mutex_is_locked(&aux->hw_mutex));
 
 	for (retry = 0, defer_i2c = 0; retry < (max_retries + defer_i2c); retry++) {
-		ret = aux->transfer(aux, msg);
+		ret = aux_transfer(aux, msg);
 		if (ret < 0) {
 			if (ret == -EBUSY)
 				continue;
 
-			DRM_DEBUG_KMS("transaction failed: %d\n", ret);
+			DRM_DEBUG_DPCD("transaction failed: %d\n", ret);
 			return ret;
 		}
 
@@ -569,11 +609,11 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 			break;
 
 		case DP_AUX_NATIVE_REPLY_NACK:
-			DRM_DEBUG_KMS("native nack (result=%d, size=%zu)\n", ret, msg->size);
+			DRM_DEBUG_DPCD("native nack (result=%d, size=%zu)\n", ret, msg->size);
 			return -EREMOTEIO;
 
 		case DP_AUX_NATIVE_REPLY_DEFER:
-			DRM_DEBUG_KMS("native defer\n");
+			DRM_DEBUG_DPCD("native defer\n");
 			/*
 			 * We could check for I2C bit rate capabilities and if
 			 * available adjust this interval. We could also be
@@ -602,12 +642,12 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 			return ret;
 
 		case DP_AUX_I2C_REPLY_NACK:
-			DRM_DEBUG_KMS("I2C nack (result=%d, size=%zu\n", ret, msg->size);
+			DRM_DEBUG_DPCD("I2C nack (result=%d, size=%zu\n", ret, msg->size);
 			aux->i2c_nack_count++;
 			return -EREMOTEIO;
 
 		case DP_AUX_I2C_REPLY_DEFER:
-			DRM_DEBUG_KMS("I2C defer\n");
+			DRM_DEBUG_DPCD("I2C defer\n");
 			/* DP Compliance Test 4.2.2.5 Requirement:
 			 * Must have at least 7 retries for I2C defers on the
 			 * transaction to pass this test
@@ -626,7 +666,7 @@ static int drm_dp_i2c_do_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 		}
 	}
 
-	DRM_DEBUG_KMS("too many retries, giving up\n");
+	DRM_ERROR("I2C: too many retries, giving up\n");
 	return -EREMOTEIO;
 }
 
@@ -654,7 +694,7 @@ static int drm_dp_i2c_drain_msg(struct drm_dp_aux *aux, struct drm_dp_aux_msg *o
 			return err == 0 ? -EPROTO : err;
 
 		if (err < msg.size && err < ret) {
-			DRM_DEBUG_KMS("Partial I2C reply: requested %zu bytes got %d bytes\n",
+			DRM_DEBUG_DPCD("Partial I2C reply: requested %zu bytes got %d bytes\n",
 				      msg.size, err);
 			ret = err;
 		}
