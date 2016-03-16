@@ -35,6 +35,7 @@ struct sync_file_cb {
  * @num_fences:		number of sync_pts in the fence
  * @wq:			wait queue for fence signaling
  * @status:		0: signaled, >0:active, <0: error
+ * @fence_array:	array with the fences in the sync_file
  * @cbs:		sync_pts callback information
  */
 struct sync_file {
@@ -49,9 +50,10 @@ struct sync_file {
 	wait_queue_head_t	wq;
 	atomic_t		status;
 
+	struct fence_array	*fence_array;
 	struct sync_file_cb	cbs[];
 };
 
 struct sync_file *sync_file_create(struct fence *fence);
-
+struct fence *sync_file_get_fence(int fd);
 #endif /* _LINUX_SYNC_H */

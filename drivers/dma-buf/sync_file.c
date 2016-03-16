@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/anon_inodes.h>
+#include <linux/fence-array.h>
 #include <linux/sync_file.h>
 #include <uapi/linux/sync_file.h>
 
@@ -122,6 +123,63 @@ err:
 	return NULL;
 }
 
+/**
+ * sync_file_get_fence - get the fence related to the sync_file fd
+ * @fd:		sync_file fd to get the fence from
+ *
+ * Ensures @fd references a valid sync_file and returns a fence that
+ * represents all fence in the sync_file.
+ *
+ * If there is only one fence in the sync_file, this fence is returned.
+ * If there is more than one, a fence_array containing all fences
+ * is created and its base fence object is returned.
+ * On both cases a reference to the returned fence is held. On error
+ * NULL is returned.
+ */
+struct fence *sync_file_get_fence(int fd)
+{
+	struct sync_file *sync_file;
+	struct fence_array *fence_array;
+	struct fence **fences;
+	int i;
+
+	sync_file = sync_file_fdget(fd);
+	if (!sync_file)
+		return NULL;
+
+	if (sync_file->num_fences == 1) {
+		struct fence *fence = sync_file->cbs[0].fence;
+
+		fence_get(fence);
+		fput(sync_file->file);
+		return fence;
+	}
+
+	fences = kcalloc(sync_file->num_fences, sizeof(**fences), GFP_KERNEL);
+	if (!fences) {
+		fput(sync_file->file);
+		return NULL;
+	}
+
+	for (i = 0 ; i < sync_file->num_fences ; i++)
+		fences[i] = sync_file->cbs[i].fence;
+
+	fence_array = fence_array_create(sync_file->num_fences, fences,
+					fence_context_alloc(1), 1, false);
+	if (!fence_array) {
+		kfree(fences);
+		fput(sync_file->file);
+		return NULL;
+	}
+
+	sync_file->fence_array = fence_array;
+	fence_get(&fence_array->base);
+	fput(sync_file->file);
+
+	return &fence_array->base;
+}
+EXPORT_SYMBOL(sync_file_get_fence);
+
 static void sync_file_add_pt(struct sync_file *sync_file, int *i,
 			     struct fence *fence)
 {
@@ -208,6 +266,9 @@ static void sync_file_free(struct kref *kref)
 	struct sync_file *sync_file = container_of(kref, struct sync_file,
 						     kref);
 	int i;
+
+	if (sync_file->fence_array)
+		fence_put(&sync_file->fence_array->base);
 
 	for (i = 0; i < sync_file->num_fences; ++i)
 		fence_put(sync_file->cbs[i].fence);
