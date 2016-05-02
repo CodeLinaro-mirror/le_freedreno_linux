@@ -64,6 +64,24 @@ The sync_file fd now can be sent to userspace.
 If the creation process fail, or the sync_file needs to be released by any
 other reason fput(sync_file->file) should be used.
 
+Receiving Sync Files from Userspace
+-----------------------------------
+
+When userspace needs to send an in-fence to the driver it pass file descriptor
+of the Sync File to the kernel. The kernel then can retrieve the sync_file
+from it.
+
+Interface:
+	struct fence *sync_file_get_fence(int fd);
+
+
+The function return a struct fence pointer referencing the fence(s) in the Sync
+File. If the Sync File contains only one fence, this fence is returned. But if
+has more than one fence a fence_collection is returned. However the callers
+only sees the collections' base class which is struct fence. In both cases
+a reference to the returned fence is held.
+
+
 References:
 [1] struct sync_file in include/linux/sync_file.h
 [2] All interfaces mentioned above defined in include/linux/sync_file.h
