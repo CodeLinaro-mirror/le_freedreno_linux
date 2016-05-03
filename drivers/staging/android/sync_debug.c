@@ -1,5 +1,5 @@
 /*
- * drivers/base/sync.c
+ * drivers/dma-buf/sync_debug.c
  *
  * Copyright (C) 2012 Google, Inc.
  *

@@ -1,5 +1,5 @@
 /*
- * include/linux/sync.h
+ * drivers/dma-buf/sync_debug.h
  *
  * Copyright (C) 2012 Google, Inc.
  *
