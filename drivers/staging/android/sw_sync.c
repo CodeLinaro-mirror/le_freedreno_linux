@@ -27,7 +27,6 @@
 
 struct sw_sync_create_fence_data {
 	__u32	value;
-	char	name[32];
 	__s32	fence; /* fd of new fence */
 };
 
