@@ -26,6 +26,8 @@
 #include <linux/sync_file.h>
 #include <uapi/linux/sync_file.h>
 
+#include "sync_debug.h"
+
 static const struct file_operations sync_file_fops;
 
 static struct sync_file *sync_file_alloc(int size)
@@ -93,6 +95,7 @@ struct sync_file *sync_file_create(struct fence *fence)
 			       fence_check_cb_func))
 		atomic_dec(&sync_file->status);
 
+	sync_file_debug_add(sync_file);
 	return sync_file;
 }
 EXPORT_SYMBOL(sync_file_create);
@@ -199,6 +202,7 @@ static struct sync_file *sync_file_merge(const char *name, struct sync_file *a,
 	sync_file->num_fences = i;
 
 	strlcpy(sync_file->name, name, sizeof(sync_file->name));
+	sync_file_debug_add(sync_file);
 	return sync_file;
 }
 
@@ -214,6 +218,7 @@ static void sync_file_free(struct kref *kref)
 		fence_put(sync_file->cbs[i].fence);
 	}
 
+	sync_file_debug_remove(sync_file);
 	kfree(sync_file);
 }
 
