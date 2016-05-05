@@ -50,9 +50,12 @@ int drm_name_info(struct seq_file *m, void *data)
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
 	struct drm_minor *minor = node->minor;
 	struct drm_device *dev = minor->dev;
-	struct drm_master *master = minor->master;
+	struct drm_master *master;
+
+	mutex_lock(&dev->master_mutex);
+	master = dev->master;
 	if (!master)
-		return 0;
+		goto out_unlock;
 
 	if (master->unique) {
 		seq_printf(m, "%s %s %s\n",
@@ -62,6 +65,9 @@ int drm_name_info(struct seq_file *m, void *data)
 		seq_printf(m, "%s %s\n",
 			   dev->driver->name, dev_name(dev->dev));
 	}
+out_unlock:
+	mutex_unlock(&dev->master_mutex);
+
 	return 0;
 }
 
