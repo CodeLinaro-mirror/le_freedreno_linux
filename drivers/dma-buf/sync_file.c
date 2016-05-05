@@ -91,9 +91,7 @@ struct sync_file *sync_file_create(struct fence *fence)
 
 	sync_file->cbs[0].fence = fence;
 	sync_file->cbs[0].sync_file = sync_file;
-	if (fence_add_callback(fence, &sync_file->cbs[0].cb,
-			       fence_check_cb_func))
-		atomic_dec(&sync_file->status);
+	INIT_LIST_HEAD(&sync_file->cbs[0].cb.node);
 
 	sync_file_debug_add(sync_file);
 	return sync_file;
@@ -130,8 +128,7 @@ static void sync_file_add_pt(struct sync_file *sync_file, int *i,
 	sync_file->cbs[*i].fence = fence;
 	sync_file->cbs[*i].sync_file = sync_file;
 
-	if (!fence_add_callback(fence, &sync_file->cbs[*i].cb,
-				fence_check_cb_func)) {
+	if (!fence_is_signaled(fence)) {
 		fence_get(fence);
 		(*i)++;
 	}
@@ -212,11 +209,8 @@ static void sync_file_free(struct kref *kref)
 						     kref);
 	int i;
 
-	for (i = 0; i < sync_file->num_fences; ++i) {
-		fence_remove_callback(sync_file->cbs[i].fence,
-				      &sync_file->cbs[i].cb);
+	for (i = 0; i < sync_file->num_fences; ++i)
 		fence_put(sync_file->cbs[i].fence);
-	}
 
 	sync_file_debug_remove(sync_file);
 	kfree(sync_file);
@@ -233,17 +227,33 @@ static int sync_file_release(struct inode *inode, struct file *file)
 static unsigned int sync_file_poll(struct file *file, poll_table *wait)
 {
 	struct sync_file *sync_file = file->private_data;
-	int status;
+	int status, i;
 
 	poll_wait(file, &sync_file->wq, wait);
 
+	for (i = 0 ; i < sync_file->num_fences ; i++) {
+		if (fence_is_enabled(sync_file->cbs[i].fence))
+			continue;
+
+		if (fence_add_callback(sync_file->cbs[i].fence,
+				       &sync_file->cbs[i].cb,
+				       fence_check_cb_func))
+			atomic_dec(&sync_file->status);
+	}
+
 	status = atomic_read(&sync_file->status);
 
-	if (!status)
-		return POLLIN;
+	if (status > 0)
+		return 0;
+
+	for (i = 0 ; i < sync_file->num_fences ; i++)
+		fence_remove_callback(sync_file->cbs[i].fence,
+				      &sync_file->cbs[i].cb);
+
 	if (status < 0)
 		return POLLERR;
-	return 0;
+
+	return POLLIN;
 }
 
 static long sync_file_ioctl_merge(struct sync_file *sync_file,

@@ -281,6 +281,18 @@ fence_is_signaled(struct fence *fence)
 }
 
 /**
+ * fence_is_enabled - return an indication if signalling is enabled
+ * @fence:	[in]	the fence to check
+ *
+ * Returns true if signalling was already enabled, false if not.
+ */
+static inline bool
+fence_is_enabled(struct fence *fence)
+{
+	return test_bit(FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags);
+}
+
+/**
  * fence_is_later - return if f1 is chronologically later than f2
  * @f1:	[in]	the first fence from the same context
  * @f2:	[in]	the second fence from the same context
