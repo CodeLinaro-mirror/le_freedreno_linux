@@ -57,6 +57,20 @@ static int drm_getunique(struct drm_device *dev, void *data,
 	struct drm_unique *u = data;
 	struct drm_master *master = file_priv->master;
 
+	/* We only need a master-specific unique in certain cases, fall back to
+	 * the device default if it's not set. */
+	if (!master->unique && dev->unique) {
+		if (u->unique_len >= strlen(dev->unique)) {
+			if (copy_to_user(u->unique, dev->unique,
+					 strlen(dev->unique)))
+				return -EFAULT;
+
+		}
+		u->unique_len = strlen(dev->unique);
+
+		return 0;
+	}
+
 	if (u->unique_len >= master->unique_len) {
 		if (copy_to_user(u->unique, master->unique, master->unique_len))
 			return -EFAULT;

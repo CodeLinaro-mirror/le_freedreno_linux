@@ -70,18 +70,6 @@ err_free:
 
 int drm_platform_set_busid(struct drm_device *dev, struct drm_master *master)
 {
-	int id;
-
-	id = dev->platformdev->id;
-	if (id < 0)
-		id = 0;
-
-	master->unique = kasprintf(GFP_KERNEL, "platform:%s:%02d",
-						dev->platformdev->name, id);
-	if (!master->unique)
-		return -ENOMEM;
-
-	master->unique_len = strlen(master->unique);
 	return 0;
 }
 EXPORT_SYMBOL(drm_platform_set_busid);
