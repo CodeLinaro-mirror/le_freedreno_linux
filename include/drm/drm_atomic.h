@@ -198,6 +198,13 @@ int __must_check drm_atomic_nonblocking_commit(struct drm_atomic_state *state);
 	     (plane_state) = (__state)->planes[__i].state, 1);		\
 	     (__i)++)							\
 		for_each_if (plane_state)
+
+/**
+ * drm_atomic_crtc_needs_modeset - compute combined modeset need
+ * @state: &drm_crtc_state for the CRTC
+ *
+ * This computes the combined need for a modeset for @state.
+ */
 static inline bool
 drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
 {
