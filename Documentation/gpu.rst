@@ -1301,7 +1301,7 @@ Implementing Asynchronous Atomic Commit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. kernel-doc:: drivers/gpu/drm/drm_atomic_helper.c
-   :doc: implementing async commit
+   :doc: implementing nonblocking commit
 
 Atomic State Reset and Initialization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
