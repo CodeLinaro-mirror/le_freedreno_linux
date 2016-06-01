@@ -463,7 +463,7 @@ mode_fixup(struct drm_atomic_state *state)
  * times for the same update, e.g. when the ->atomic_check functions depend upon
  * the adjusted dotclock for fifo space allocation and watermark computation.
  *
- * RETURNS
+ * RETURNS:
  * Zero for success or -errno
  */
 int
@@ -577,7 +577,7 @@ EXPORT_SYMBOL(drm_atomic_helper_check_modeset);
  * It also sets crtc_state->planes_changed to indicate that a crtc has
  * updated planes.
  *
- * RETURNS
+ * RETURNS:
  * Zero for success or -errno
  */
 int
@@ -645,7 +645,7 @@ EXPORT_SYMBOL(drm_atomic_helper_check_planes);
  * ->atomic_check functions depend upon an updated adjusted_mode.clock to
  * e.g. properly compute watermarks.
  *
- * RETURNS
+ * RETURNS:
  * Zero for success or -errno
  */
 int drm_atomic_helper_check(struct drm_device *dev,
@@ -1204,7 +1204,7 @@ static void commit_work(struct work_struct *work)
  * ->atomic_commit_tail() callback of the &drm_mode_config_helper_funcs vtable,
  * or it's default implementation drm_atomic_helper_commit_tail().
  *
- * RETURNS
+ * RETURNS:
  * Zero for success or -errno.
  */
 int drm_atomic_helper_commit(struct drm_device *dev,
