@@ -182,6 +182,39 @@ void drm_mode_object_reference(struct drm_mode_object *obj)
 }
 EXPORT_SYMBOL(drm_mode_object_reference);
 
+/*
+ * return true of object is allowed for this file priv
+ */
+bool drm_mode_object_allowed(struct drm_device *dev,
+			     struct drm_mode_object *obj,
+			     struct drm_file *file_priv)
+{
+	int i;
+
+	/* if the object is not exclusive and file is
+	 * not exclusive, allow it.
+	 */
+	if (!obj->exclusive_access && !file_priv->num_exclusive)
+		return true;
+
+	/* if we are exclusive and the object is on our list - allow it */
+	for (i = 0; i < file_priv->num_exclusive; i++) {
+		if (file_priv->exclusive_objects[i] == obj->id)
+			return true;
+	}
+
+	/* if we are exclusive and the object wasn't found - don't allow it */
+	if (file_priv->num_exclusive)
+		return false;
+	
+	/* if we aren't exclusive and the object has exclusive access enabled
+	   ignore it */
+	if (obj->exclusive_access)
+		return false;
+
+	return true;
+}
+
 /**
  * drm_object_attach_property - attach a property to a modeset object
  * @obj: drm modeset object

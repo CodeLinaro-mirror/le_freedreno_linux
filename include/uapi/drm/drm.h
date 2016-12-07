@@ -647,6 +647,7 @@ struct drm_gem_open {
 #define DRM_CAP_CURSOR_HEIGHT		0x9
 #define DRM_CAP_ADDFB2_MODIFIERS	0x10
 #define DRM_CAP_PAGE_FLIP_TARGET	0x11
+#define DRM_CAP_ALLOWED_RESOURCES       0x12
 
 /** DRM_IOCTL_GET_CAP ioctl argument type */
 struct drm_get_cap {
@@ -677,6 +678,11 @@ struct drm_get_cap {
  * If set to 1, the DRM core will expose atomic properties to userspace
  */
 #define DRM_CLIENT_CAP_ATOMIC	3
+
+/**
+ * DRM_CLIENT_CAP_ALLOWED_RESOURCES
+ */
+#define DRM_CLIENT_CAP_ALLOWED_RESOURCES 4
 
 /** DRM_IOCTL_SET_CLIENT_CAP ioctl argument type */
 struct drm_set_client_cap {
@@ -813,6 +819,9 @@ extern "C" {
 #define DRM_IOCTL_MODE_ATOMIC		DRM_IOWR(0xBC, struct drm_mode_atomic)
 #define DRM_IOCTL_MODE_CREATEPROPBLOB	DRM_IOWR(0xBD, struct drm_mode_create_blob)
 #define DRM_IOCTL_MODE_DESTROYPROPBLOB	DRM_IOWR(0xBE, struct drm_mode_destroy_blob)
+
+#define DRM_IOCTL_MODE_GETALLOWEDRES	DRM_IOWR(0xBF, struct drm_mode_allowed_res)
+#define DRM_IOCTL_MODE_EXCLUSIVE_MODE   DRM_IOWR(0xC0, struct drm_mode_exclusive_res)
 
 /**
  * Device specific ioctls should only be in their respective headers

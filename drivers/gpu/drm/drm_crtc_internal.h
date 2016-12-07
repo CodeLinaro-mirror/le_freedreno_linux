@@ -55,11 +55,15 @@ int drm_mode_setcrtc(struct drm_device *dev,
 /* drm_mode_config.c */
 int drm_modeset_register_all(struct drm_device *dev);
 void drm_modeset_unregister_all(struct drm_device *dev);
-
+void drm_mode_clear_exclusives(struct drm_device *dev,
+			       struct drm_file *file_priv, bool hotplug);
 /* IOCTLs */
 int drm_mode_getresources(struct drm_device *dev,
 			  void *data, struct drm_file *file_priv);
-
+int drm_mode_getallowedres_ioctl(struct drm_device *dev, void *data,
+				 struct drm_file *file_priv);
+int drm_mode_exclusive_mode_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *file_priv);
 
 /* drm_dumb_buffers.c */
 /* IOCTLs */

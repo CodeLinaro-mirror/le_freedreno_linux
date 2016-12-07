@@ -277,6 +277,9 @@ static int drm_getcap(struct drm_device *dev, void *data, struct drm_file *file_
 	case DRM_CAP_ADDFB2_MODIFIERS:
 		req->value = dev->mode_config.allow_fb_modifiers;
 		break;
+	case DRM_CAP_ALLOWED_RESOURCES:
+		req->value = 1;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -309,6 +312,11 @@ drm_setclientcap(struct drm_device *dev, void *data, struct drm_file *file_priv)
 			return -EINVAL;
 		file_priv->atomic = req->value;
 		file_priv->universal_planes = req->value;
+		break;
+	case DRM_CLIENT_CAP_ALLOWED_RESOURCES:
+		if (req->value > 1)
+			return -EINVAL;
+		file_priv->allowed_resources = req->value;
 		break;
 	default:
 		return -EINVAL;
@@ -629,6 +637,9 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_ATOMIC, drm_mode_atomic_ioctl, DRM_MASTER|DRM_CONTROL_ALLOW|DRM_UNLOCKED),
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CREATEPROPBLOB, drm_mode_createblob_ioctl, DRM_CONTROL_ALLOW|DRM_UNLOCKED),
 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_DESTROYPROPBLOB, drm_mode_destroyblob_ioctl, DRM_CONTROL_ALLOW|DRM_UNLOCKED),
+
+	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETALLOWEDRES, drm_mode_getallowedres_ioctl, DRM_MASTER|DRM_UNLOCKED),
+	DRM_IOCTL_DEF(DRM_IOCTL_MODE_EXCLUSIVE_MODE, drm_mode_exclusive_mode_ioctl, DRM_ROOT_ONLY),
 };
 
 #define DRM_CORE_IOCTL_COUNT	ARRAY_SIZE( drm_ioctls )

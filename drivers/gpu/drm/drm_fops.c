@@ -396,6 +396,7 @@ int drm_release(struct inode *inode, struct file *filp)
 	drm_events_release(file_priv);
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		drm_mode_clear_exclusives(dev, file_priv, true);
 		drm_fb_release(file_priv);
 		drm_property_destroy_user_blobs(dev, file_priv);
 	}

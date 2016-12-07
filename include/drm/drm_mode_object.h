@@ -53,6 +53,7 @@ struct drm_device;
 struct drm_mode_object {
 	uint32_t id;
 	uint32_t type;
+	bool exclusive_access;
 	struct drm_object_properties *properties;
 	struct kref refcount;
 	void (*free_cb)(struct kref *kref);
@@ -122,4 +123,10 @@ int drm_object_property_get_value(struct drm_mode_object *obj,
 void drm_object_attach_property(struct drm_mode_object *obj,
 				struct drm_property *property,
 				uint64_t init_val);
+
+struct drm_file;
+bool drm_mode_object_allowed(struct drm_device *dev,
+			     struct drm_mode_object *obj,
+			     struct drm_file *file_priv);
+
 #endif

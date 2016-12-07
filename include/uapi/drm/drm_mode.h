@@ -158,6 +158,21 @@ struct drm_mode_card_res {
 	__u32 max_height;
 };
 
+/* also used for exclusive mode */
+struct drm_mode_allowed_res {
+	__u64 crtc_id_ptr;
+	__u64 connector_id_ptr;
+	__u64 plane_id_ptr;
+	__u32 count_crtcs;
+	__u32 count_connectors;
+	__u32 count_planes;
+};
+
+struct drm_mode_exclusive_res {
+	__u64 id_ptr;
+	__u32 count_ids;
+};
+
 struct drm_mode_crtc {
 	__u64 set_connectors_ptr;
 	__u32 count_connectors;

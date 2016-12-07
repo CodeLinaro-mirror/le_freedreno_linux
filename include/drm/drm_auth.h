@@ -50,6 +50,7 @@ struct drm_master {
 	struct idr magic_map;
 	struct drm_lock_data lock;
 	void *driver_priv;
+	bool allowed_resources;
 };
 
 struct drm_master *drm_master_get(struct drm_master *master);

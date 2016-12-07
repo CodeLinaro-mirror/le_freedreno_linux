@@ -375,6 +375,7 @@ struct drm_prime_file_private {
 	struct rb_root handles;
 };
 
+#define DRM_FILE_MAX_EXCLUSIVE 4
 /** File private data */
 struct drm_file {
 	unsigned authenticated :1;
@@ -387,6 +388,8 @@ struct drm_file {
 	unsigned universal_planes:1;
 	/* true if client understands atomic properties */
 	unsigned atomic:1;
+	/* true if this file will respect the allowed resources data */
+	unsigned allowed_resources:1;
 	/*
 	 * This client is the creator of @master.
 	 * Protected by struct drm_device::master_mutex.
@@ -430,6 +433,10 @@ struct drm_file {
 	struct mutex event_read_lock;
 
 	struct drm_prime_file_private prime;
+
+	/* objects exclusive to this file descriptor - crtcs and connectors - fbs(??) */
+	int num_exclusive;
+	uint32_t exclusive_objects[DRM_FILE_MAX_EXCLUSIVE];
 };
 
 /**

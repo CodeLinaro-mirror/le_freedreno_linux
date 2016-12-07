@@ -194,6 +194,186 @@ out:
 	return ret;
 }
 
+int drm_mode_getallowedres_ioctl(struct drm_device *dev, void *data,
+				 struct drm_file *file_priv)
+{
+	struct drm_mode_allowed_res *allowed_list = data;
+	struct drm_connector *connector;
+	struct drm_crtc *crtc;
+	struct drm_plane *plane;
+	int connector_count = 0;
+	int crtc_count = 0;
+	int plane_count = 0;
+	int ret = 0;
+	int copied = 0;
+	uint32_t __user *id;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return -EINVAL;
+
+	if (!file_priv->allowed_resources)
+		return -EINVAL;
+
+	/* mode_config.mutex protects the connector list against e.g. DP MST
+	 * connector hot-adding. CRTC/Plane lists are invariant. */
+	drm_for_each_plane(plane, dev) {
+		/*
+		 * Unless userspace set the 'universal planes'
+		 * capability bit, only advertise overlays.
+		 */
+		if (plane->type != DRM_PLANE_TYPE_OVERLAY &&
+		    !file_priv->universal_planes)
+			continue;
+		if (drm_mode_object_allowed(dev, &plane->base, file_priv))
+			plane_count++;
+	}
+
+	mutex_lock(&dev->mode_config.mutex);
+	drm_for_each_crtc(crtc, dev) {
+		if (drm_mode_object_allowed(dev, &crtc->base, file_priv))
+			crtc_count++;
+	}
+
+	drm_for_each_crtc(connector, dev) {
+		if (drm_mode_object_allowed(dev, &connector->base, file_priv))
+			connector_count++;
+	}
+
+	if (allowed_list->count_planes >= plane_count) {
+		copied = 0;
+		id = (uint32_t __user *)(unsigned long)allowed_list->plane_id_ptr;
+		drm_for_each_plane(plane, dev) {
+			/*
+			 * Unless userspace set the 'universal planes'
+			 * capability bit, only advertise overlays.
+			 */
+			if (plane->type != DRM_PLANE_TYPE_OVERLAY &&
+			    !file_priv->universal_planes)
+				continue;
+
+			if (put_user(plane->base.id, id + copied)) {
+				ret = -EFAULT;
+				goto out;
+			}
+			copied++;
+		}
+	}
+	allowed_list->count_planes = plane_count;
+
+	if (allowed_list->count_crtcs >= crtc_count) {
+		copied = 0;
+		id = (uint32_t __user *)(unsigned long)allowed_list->crtc_id_ptr;
+		drm_for_each_crtc(crtc, dev) {
+			if (drm_mode_object_allowed(dev, &crtc->base, file_priv)) {
+				if (put_user(crtc->base.id, id + copied)) {
+					ret = -EFAULT;
+					goto out;
+				}
+				copied++;
+			}
+		}
+	}
+	allowed_list->count_crtcs = crtc_count;
+
+	if (allowed_list->count_connectors >= connector_count) {
+		copied = 0;
+		id = (uint32_t __user *)(unsigned long)allowed_list->connector_id_ptr;
+		drm_for_each_connector(connector, dev) {
+			if (drm_mode_object_allowed(dev, &connector->base, file_priv)) {
+				if (put_user(connector->base.id, id + copied)) {
+					ret = -EFAULT;
+					goto out;
+				}
+				copied++;
+			}
+		}
+	}
+	allowed_list->count_connectors = connector_count;
+
+out:
+	mutex_unlock(&dev->mode_config.mutex);
+	return ret;
+}
+
+int drm_mode_exclusive_mode_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *file_priv)
+{
+	struct drm_mode_exclusive_res *list = data;
+	int ret = 0;
+	int i;
+	uint32_t __user *id;
+	bool promote_to_master = true;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return -EINVAL;
+
+	if (!file_priv->allowed_resources)
+		return -EINVAL;
+
+	/* current master must support allowed resources */
+	if (file_priv->master && !drm_master_respects_allowed_resources(file_priv->master))
+		return -EINVAL;
+
+	/* once only operation - nuke all current exclusives - maybe post hotplug */
+	if (file_priv->num_exclusive) {
+		drm_mode_clear_exclusives(dev, file_priv, false);
+		promote_to_master = false;
+	}
+
+	/* return if we have no crtcs or connectors left */
+	if (list->count_ids == 0)
+		return 0;
+
+	if (list->count_ids > DRM_FILE_MAX_EXCLUSIVE)
+		return -EINVAL;
+
+	mutex_lock(&dev->mode_config.mutex);
+	for (i = 0; i < list->count_ids; i++) {
+		id = (uint32_t __user *)(unsigned long)list->id_ptr;
+		if (get_user(file_priv->exclusive_objects[i], id + i)) {
+			ret = -EFAULT;
+			goto out;
+		}
+	}
+	file_priv->num_exclusive = list->count_ids;
+	mutex_unlock(&dev->mode_config.mutex);
+
+	/* should we use this ioctl to elevate this process to master? */
+	if (promote_to_master)
+		ret = drm_new_set_master(dev, file_priv, false);
+
+	/* send hotplug so everyone updates their ignore lists */
+	drm_sysfs_hotplug_event(dev);
+out:
+	return ret;
+}
+
+void drm_mode_clear_exclusives(struct drm_device *dev,
+			       struct drm_file *file_priv,
+			       bool hotplug)
+{
+	struct drm_mode_object *obj;
+	int i;
+
+	if (!file_priv->num_exclusive)
+		return;
+       
+	mutex_lock(&dev->mode_config.mutex);
+	for (i = 0; i < file_priv->num_exclusive; i++) {
+		obj = drm_mode_object_find(dev, file_priv->exclusive_objects[i], DRM_MODE_OBJECT_ANY);
+		if (!obj)
+			continue;
+
+		obj->exclusive_access = false;
+	}
+	file_priv->num_exclusive = 0;
+	mutex_unlock(&dev->mode_config.mutex);
+
+	/* send hotplug so everyone updates their ignore lists */
+	if (hotplug)
+		drm_sysfs_hotplug_event(dev);
+}
+
 /**
  * drm_mode_config_reset - call ->reset callbacks
  * @dev: drm device

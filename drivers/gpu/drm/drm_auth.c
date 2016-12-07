@@ -93,7 +93,7 @@ int drm_authmagic(struct drm_device *dev, void *data,
 	return file ? 0 : -EINVAL;
 }
 
-static struct drm_master *drm_master_create(struct drm_device *dev)
+static struct drm_master *drm_master_create(struct drm_device *dev, bool allowed_resources)
 {
 	struct drm_master *master;
 
@@ -106,7 +106,7 @@ static struct drm_master *drm_master_create(struct drm_device *dev)
 	init_waitqueue_head(&master->lock.lock_queue);
 	idr_init(&master->magic_map);
 	master->dev = dev;
-
+	master->allowed_resources = allowed_resources;
 	return master;
 }
 
@@ -126,7 +126,8 @@ static int drm_set_master(struct drm_device *dev, struct drm_file *fpriv,
 	return ret;
 }
 
-static int drm_new_set_master(struct drm_device *dev, struct drm_file *fpriv)
+int drm_new_set_master(struct drm_device *dev, struct drm_file *fpriv,
+		       bool set_device)
 {
 	struct drm_master *old_master;
 	int ret;
@@ -134,7 +135,7 @@ static int drm_new_set_master(struct drm_device *dev, struct drm_file *fpriv)
 	lockdep_assert_held_once(&dev->master_mutex);
 
 	old_master = fpriv->master;
-	fpriv->master = drm_master_create(dev);
+	fpriv->master = drm_master_create(dev, fpriv->allowed_resources);
 	if (!fpriv->master) {
 		fpriv->master = old_master;
 		return -ENOMEM;
@@ -148,9 +149,11 @@ static int drm_new_set_master(struct drm_device *dev, struct drm_file *fpriv)
 	fpriv->is_master = 1;
 	fpriv->authenticated = 1;
 
-	ret = drm_set_master(dev, fpriv, true);
-	if (ret)
-		goto out_err;
+	if (set_device) {
+		ret = drm_set_master(dev, fpriv, true);
+		if (ret)
+			goto out_err;
+	}
 
 	if (old_master)
 		drm_master_put(&old_master);
@@ -185,7 +188,7 @@ int drm_setmaster_ioctl(struct drm_device *dev, void *data,
 	}
 
 	if (!file_priv->is_master) {
-		ret = drm_new_set_master(dev, file_priv);
+		ret = drm_new_set_master(dev, file_priv, true);
 		goto out_unlock;
 	}
 
@@ -231,7 +234,7 @@ int drm_master_open(struct drm_file *file_priv)
 	 * any master object for render clients */
 	mutex_lock(&dev->master_mutex);
 	if (!dev->master)
-		ret = drm_new_set_master(dev, file_priv);
+		ret = drm_new_set_master(dev, file_priv, true);
 	else
 		file_priv->master = drm_master_get(dev->master);
 	mutex_unlock(&dev->master_mutex);
@@ -291,6 +294,11 @@ bool drm_is_current_master(struct drm_file *fpriv)
 	return fpriv->is_master && fpriv->master == fpriv->minor->dev->master;
 }
 EXPORT_SYMBOL(drm_is_current_master);
+
+bool drm_master_respects_allowed_resources(struct drm_master *master)
+{
+	return master->allowed_resources;
+}
 
 /**
  * drm_master_get - reference a master pointer

@@ -511,8 +511,13 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 		ret = -ENOENT;
 		goto out;
 	}
-	DRM_DEBUG_KMS("[CRTC:%d:%s]\n", crtc->base.id, crtc->name);
 
+	if (!drm_mode_object_allowed(dev, &crtc->base, file_priv)) {
+		ret = 0;
+		DRM_DEBUG_KMS("[CRTC:%d:%s] on ignore list\n", crtc->base.id, crtc->name);
+		goto out;
+	}
+	DRM_DEBUG_KMS("[CRTC:%d:%s]\n", crtc->base.id, crtc->name);
 	if (crtc_req->mode_valid) {
 		/* If we have a mode we need a framebuffer. */
 		/* If we pass -1, set the mode with the currently bound fb */
@@ -616,6 +621,13 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 				DRM_DEBUG_KMS("Connector id %d unknown\n",
 						out_id);
 				ret = -ENOENT;
+				goto out;
+			}
+
+			if (!drm_mode_object_allowed(dev, &connector->base, file_priv)) {
+				ret = 0;
+				DRM_DEBUG_KMS("[CONNECTOR:%d:%s] on ignore list\n", connector->base.id,
+					      connector->name);
 				goto out;
 			}
 			DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
