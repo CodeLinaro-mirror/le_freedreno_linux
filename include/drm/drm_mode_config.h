@@ -87,6 +87,14 @@ struct drm_mode_config_funcs {
 	void (*output_poll_changed)(struct drm_device *dev);
 
 	/**
+	 * @output_poll_execute:
+	 *
+	 * Used to allow driver to wrap the output polling for power management
+	 * purposes and avoid locking issues.
+	 */
+	bool (*output_poll_execute)(struct drm_device *dev);
+
+	/**
 	 * @atomic_check:
 	 *
 	 * This is the only hook to validate an atomic modeset update. This

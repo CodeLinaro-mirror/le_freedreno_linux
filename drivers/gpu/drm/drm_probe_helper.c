@@ -380,10 +380,15 @@ void drm_kms_helper_hotplug_event(struct drm_device *dev)
 }
 EXPORT_SYMBOL(drm_kms_helper_hotplug_event);
 
-static void output_poll_execute(struct work_struct *work)
+/**
+ * drm_kms_helper_poll_outputs - poll all the outputs for hotplug
+ * @dev: drm_device to probe outputs on.
+ *
+ * This is to be called by drivers that need to wrap the output poll
+ * execution for power management purposes.
+ */
+bool drm_kms_helper_poll_outputs(struct drm_device *dev)
 {
-	struct delayed_work *delayed_work = to_delayed_work(work);
-	struct drm_device *dev = container_of(delayed_work, struct drm_device, mode_config.output_poll_work);
 	struct drm_connector *connector;
 	struct drm_connector_list_iter conn_iter;
 	enum drm_connector_status old_status;
@@ -463,6 +468,20 @@ out:
 	if (changed)
 		drm_kms_helper_hotplug_event(dev);
 
+	return repoll;
+}
+EXPORT_SYMBOL(drm_kms_helper_poll_outputs);
+
+static void output_poll_execute(struct work_struct *work)
+{
+	struct delayed_work *delayed_work = to_delayed_work(work);
+	struct drm_device *dev = container_of(delayed_work, struct drm_device, mode_config.output_poll_work);
+	bool repoll;
+
+	if (dev->mode_config.funcs->output_poll_execute)
+		repoll = dev->mode_config.funcs->output_poll_execute(dev);
+	else
+		repoll = drm_kms_helper_poll_outputs(dev);
 	if (repoll)
 		schedule_delayed_work(delayed_work, DRM_OUTPUT_POLL_PERIOD);
 }
