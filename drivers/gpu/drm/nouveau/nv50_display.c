@@ -4323,10 +4323,26 @@ nv50_disp_atomic_state_alloc(struct drm_device *dev)
 	return &atom->state;
 }
 
+static bool
+nv50_disp_output_poll_execute(struct drm_device *dev)
+{
+	int ret;
+	bool repoll;
+	ret = pm_runtime_get_sync(dev->dev);
+	if (ret < 0 && ret != -EACCES)
+		return true;
+
+	repoll = drm_kms_helper_poll_outputs(dev);
+	pm_runtime_mark_last_busy(dev->dev);
+	pm_runtime_put_autosuspend(dev->dev);
+	return repoll;
+}
+
 static const struct drm_mode_config_funcs
 nv50_disp_func = {
 	.fb_create = nouveau_user_framebuffer_create,
 	.output_poll_changed = nouveau_fbcon_output_poll_changed,
+	.output_poll_execute = nv50_disp_output_poll_execute,
 	.atomic_check = nv50_disp_atomic_check,
 	.atomic_commit = nv50_disp_atomic_commit,
 	.atomic_state_alloc = nv50_disp_atomic_state_alloc,
